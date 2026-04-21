@@ -123,6 +123,21 @@ app.get('/api/payment/:paymentId', async (req, res) => {
   }
 });
 
+// ── Serve Frontend in Production ───────────────────────────────────────────
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Serve the static files from the React app
+app.use(express.static(path.join(__dirname, '../dist')));
+
+// Handles any requests that don't match the API ones
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../dist/index.html'));
+});
+
 // ── Start Server ───────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
