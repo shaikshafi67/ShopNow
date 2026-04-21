@@ -21,8 +21,8 @@ function fileToBase64(file) {
   });
 }
 
-// Compress image to max width/height of 800px and JPEG 0.8 quality
-function compressImage(dataUrl, maxSize = 800) {
+// Compress image to max width/height to save localStorage space
+function compressImage(dataUrl, maxSize = 400) {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
@@ -37,7 +37,7 @@ function compressImage(dataUrl, maxSize = 800) {
       canvas.height = h;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, w, h);
-      resolve(canvas.toDataURL('image/jpeg', 0.8));
+      resolve(canvas.toDataURL('image/jpeg', 0.5));
     };
     img.src = dataUrl;
   });
