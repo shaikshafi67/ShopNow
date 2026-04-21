@@ -21,8 +21,8 @@ function fileToBase64(file) {
   });
 }
 
-// Compress image to max width/height to save localStorage space
-function compressImage(dataUrl, maxSize = 400) {
+// Compress image slightly to fit within massive IndexedDB limits without noticeable loss
+function compressImage(dataUrl, maxSize = 2000) {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
@@ -37,7 +37,8 @@ function compressImage(dataUrl, maxSize = 400) {
       canvas.height = h;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, w, h);
-      resolve(canvas.toDataURL('image/jpeg', 0.5));
+      // High quality JPEG (0.95)
+      resolve(canvas.toDataURL('image/jpeg', 0.95));
     };
     img.src = dataUrl;
   });

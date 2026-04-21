@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { read, write, uid } from '../utils/storage';
+import { uid } from '../utils/storage';
+import { get, set } from '../utils/idb';
 import { allProducts as seedProducts } from '../data/products';
 
 const CatalogContext = createContext(null);
@@ -9,18 +10,38 @@ export function useCatalog() {
   return ctx;
 }
 
-function loadProducts() {
-  const stored = read('catalog', null);
-  if (stored && Array.isArray(stored) && stored.length > 0) return stored;
-  // First boot — seed from static catalog with stock counts
-  const seeded = seedProducts.map((p) => ({ ...p, stock: 25 }));
-  write('catalog', seeded);
-  return seeded;
-}
-
 export function CatalogProvider({ children }) {
-  const [products, setProducts] = useState(loadProducts);
-  useEffect(() => { write('catalog', products); }, [products]);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Initial load from IndexedDB
+  useEffect(() => {
+    async function init() {
+      try {
+        const stored = await get('catalog');
+        if (stored && Array.isArray(stored) && stored.length > 0) {
+          setProducts(stored);
+        } else {
+          const seeded = seedProducts.map((p) => ({ ...p, stock: 25 }));
+          await set('catalog', seeded);
+          setProducts(seeded);
+        }
+      } catch (err) {
+        console.error('Failed to load from IndexedDB', err);
+        setProducts(seedProducts.map((p) => ({ ...p, stock: 25 })));
+      } finally {
+        setLoading(false);
+      }
+    }
+    init();
+  }, []);
+
+  // Save to IndexedDB whenever products change
+  useEffect(() => {
+    if (!loading) {
+      set('catalog', products).catch(err => console.error('Failed to save to IndexedDB', err));
+    }
+  }, [products, loading]);
 
   const byId = useCallback((id) => products.find((p) => p.id === id), [products]);
 
@@ -30,15 +51,15 @@ export function CatalogProvider({ children }) {
   );
 
   const categories = useMemo(() => {
-    const set = new Set();
-    products.forEach((p) => set.add(p.category));
-    return Array.from(set);
+    const setCategory = new Set();
+    products.forEach((p) => setCategory.add(p.category));
+    return Array.from(setCategory);
   }, [products]);
 
   const brands = useMemo(() => {
-    const set = new Set();
-    products.forEach((p) => p.brand && set.add(p.brand));
-    return Array.from(set);
+    const setBrand = new Set();
+    products.forEach((p) => p.brand && setBrand.add(p.brand));
+    return Array.from(setBrand);
   }, [products]);
 
   const create = useCallback((data) => {
@@ -82,6 +103,15 @@ export function CatalogProvider({ children }) {
     const fresh = seedProducts.map((p) => ({ ...p, stock: 25 }));
     setProducts(fresh);
   }, []);
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-app)' }}>
+        <div style={{ width: 40, height: 40, border: '3px solid var(--border-glass)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
 
   return (
     <CatalogContext.Provider value={{
