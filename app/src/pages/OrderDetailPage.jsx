@@ -1,4 +1,4 @@
-import { useParams, useSearchParams, Link } from 'react-router-dom';
+import { useParams, useSearchParams, useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { CheckCircle, Package, Truck, MapPin, CreditCard, ChevronLeft, Clock, XCircle, Star, Download, FileText } from 'lucide-react';
 import { useOrders, ORDER_STAGES } from '../context/OrdersContext';
@@ -105,22 +105,32 @@ function downloadInvoice(order) {
   const html = generateInvoiceHTML(order);
   const blob = new Blob([html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
-  const win = window.open(url, '_blank');
-  if (win) {
-    win.addEventListener('load', () => {
-      win.document.title = `Invoice ${order.number}`;
-    });
-  }
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Invoice-${order.number}.html`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
 export default function OrderDetailPage() {
   const { id } = useParams();
   const [params] = useSearchParams();
+  const location = useLocation();
   const justPlaced = params.get('placed') === '1';
-  const { findById, cancel } = useOrders();
+  const { findById, cancel, loading } = useOrders();
   const { isAdmin } = useAuth();
   const order = findById(id);
+
+  if (loading) {
+    return (
+      <div style={{ paddingTop: 'var(--nav-height)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: 36, height: 36, border: '3px solid var(--border-glass)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
 
   if (!order) {
     return (
@@ -143,18 +153,21 @@ export default function OrderDetailPage() {
           <motion.div
             initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }}
             style={{
-              background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)',
+              background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.3)',
               borderRadius: 14, padding: '14px 20px', marginBottom: 24,
-              display: 'flex', alignItems: 'center', gap: 12,
+              display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
             }}
           >
             <CheckCircle size={22} color="#22c55e" />
-            <div>
+            <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 700, color: '#22c55e' }}>Order placed successfully!</div>
               <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                You'll receive updates via email. Estimated delivery: {shortDate(order.estimatedDelivery)}.
+                Estimated delivery: {shortDate(order.estimatedDelivery)}.
               </div>
             </div>
+            <Link to="/" className="btn btn-ghost" style={{ textDecoration: 'none', fontSize: 13 }}>
+              Continue Shopping
+            </Link>
           </motion.div>
         )}
 
@@ -172,13 +185,6 @@ export default function OrderDetailPage() {
             </p>
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button
-              onClick={() => downloadInvoice(order)}
-              className="btn btn-secondary"
-              style={{ fontSize: 13, gap: 6 }}
-            >
-              <Download size={15} /> Download Invoice
-            </button>
             {canCancel && (
               <button
                 onClick={() => { if (window.confirm('Cancel this order?')) cancel(order.id); }}
@@ -252,7 +258,9 @@ export default function OrderDetailPage() {
                 <div>
                   <div style={{ fontWeight: 700, color: '#ef4444' }}>Order cancelled</div>
                   <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                    Refund will be processed within 5–7 business days.
+                    {order.payment?.method === 'cod'
+                      ? 'Your order has been cancelled. No payment was collected.'
+                      : 'Refund will be processed within 5–7 business days.'}
                   </div>
                 </div>
               </div>

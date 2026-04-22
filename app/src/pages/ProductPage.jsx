@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Heart, ShoppingBag, Sparkles, Star, ChevronLeft, ChevronRight, RotateCcw, Shield, Truck, Share2, Minus, Plus, CheckCircle } from 'lucide-react';
 import { useCatalog } from '../context/CatalogContext';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import { useToast } from '../context/ToastContext';
 import ProductCard from '../components/ProductCard';
@@ -16,6 +17,7 @@ export default function ProductPage() {
   const navigate = useNavigate();
   const { byId, products } = useCatalog();
   const { add: addToCart } = useCart();
+  const { user } = useAuth();
   const { has, toggle: toggleWishlist } = useWishlist();
   const toast = useToast();
 
@@ -45,6 +47,10 @@ export default function ProductPage() {
   };
 
   const handleAddToCart = () => {
+    if (!user) {
+      navigate('/login', { state: { from: `/product/${product.id}` } });
+      return;
+    }
     if (!selectedSize && product.sizes?.length) {
       toast.error('Please select a size first.');
       return;

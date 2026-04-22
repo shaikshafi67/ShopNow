@@ -3,11 +3,12 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Search as SearchIcon, ArrowRight } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
-import { allProducts } from '../data/products';
+import { useCatalog } from '../context/CatalogContext';
 
 function scoreProduct(product, query) {
   const q = query.toLowerCase();
   const name = (product.name || '').toLowerCase();
+  const brand = (product.brand || '').toLowerCase();
   const category = (product.category || '').toLowerCase();
   const description = (product.description || '').toLowerCase();
   const tag = (product.tag || '').toLowerCase();
@@ -16,6 +17,7 @@ function scoreProduct(product, query) {
   if (name === q) score += 100;
   if (name.startsWith(q)) score += 40;
   if (name.includes(q)) score += 20;
+  if (brand.includes(q)) score += 15;
   if (category.includes(q)) score += 12;
   if (tag.includes(q)) score += 8;
   if (description.includes(q)) score += 4;
@@ -25,15 +27,23 @@ function scoreProduct(product, query) {
 export default function SearchPage() {
   const [params] = useSearchParams();
   const query = (params.get('q') || '').trim();
+  const category = (params.get('category') || '').trim();
+  const { products } = useCatalog();
 
   const results = useMemo(() => {
+    if (category) {
+      return products.filter((p) => (p.category || '').toLowerCase() === category.toLowerCase());
+    }
     if (!query) return [];
-    return allProducts
+    return products
       .map((p) => ({ p, score: scoreProduct(p, query) }))
       .filter((r) => r.score > 0)
       .sort((a, b) => b.score - a.score)
       .map((r) => r.p);
-  }, [query]);
+  }, [query, category, products]);
+
+  const isCategory = !!category;
+  const isEmpty = isCategory ? results.length === 0 : !query;
 
   return (
     <div style={{ paddingTop: 'var(--nav-height)', minHeight: '100vh' }}>
@@ -59,27 +69,29 @@ export default function SearchPage() {
               <SearchIcon size={20} color="var(--accent)" />
             </div>
             <div>
-              <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 2 }}>Search results</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 2 }}>
+                {isCategory ? 'Collection' : 'Search results'}
+              </p>
               <h1 style={{
                 fontFamily: 'var(--font-display)',
                 fontSize: 'clamp(24px, 3.5vw, 34px)',
                 fontWeight: 800,
                 lineHeight: 1.1,
               }}>
-                {query ? `"${query}"` : 'Type something in the search bar'}
+                {isCategory ? category : (query ? `"${query}"` : 'Type something in the search bar')}
               </h1>
             </div>
           </motion.div>
-          {query && (
+          {(isCategory || query) && (
             <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
-              {results.length} {results.length === 1 ? 'result' : 'results'} found
+              {results.length} {results.length === 1 ? 'product' : 'products'} found
             </p>
           )}
         </div>
       </div>
 
       <div className="container" style={{ padding: '40px 24px 80px' }}>
-        {!query && (
+        {isEmpty && !isCategory && (
           <div style={{ textAlign: 'center', padding: '60px 0' }}>
             <p style={{ color: 'var(--text-secondary)', fontSize: 16, marginBottom: 24 }}>
               Try searching for "tshirt", "saree", "polo", or "dress".
@@ -95,18 +107,13 @@ export default function SearchPage() {
           </div>
         )}
 
-        {query && results.length === 0 && (
+        {(query || isCategory) && results.length === 0 && (
           <div style={{ textAlign: 'center', padding: '60px 0' }}>
-            <h2 style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 26,
-              fontWeight: 700,
-              marginBottom: 10,
-            }}>
-              No matches found
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, marginBottom: 10 }}>
+              No products found
             </h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: 15, marginBottom: 28, maxWidth: 480, margin: '0 auto 28px' }}>
-              We could not find anything for "{query}". Try a different keyword, or browse the full collection.
+              {isCategory ? `No products in "${category}" yet.` : `We could not find anything for "${query}".`}
             </p>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
               <Link to="/men" className="btn btn-primary" style={{ textDecoration: 'none', gap: 8 }}>
@@ -119,7 +126,7 @@ export default function SearchPage() {
           </div>
         )}
 
-        {query && results.length > 0 && (
+        {(query || isCategory) && results.length > 0 && (
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',

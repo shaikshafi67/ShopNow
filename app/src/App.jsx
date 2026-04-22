@@ -12,6 +12,7 @@ import WishlistPage from './pages/WishlistPage';
 import SearchPage from './pages/SearchPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ProfilePage from './pages/ProfilePage';
 import OrdersPage from './pages/OrdersPage';
 import OrderDetailPage from './pages/OrderDetailPage';
@@ -21,9 +22,11 @@ import RequireAuth from './components/RequireAuth';
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminProducts from './pages/admin/AdminProducts';
+import AdminCollections from './pages/admin/AdminCollections';
 import AdminOrders from './pages/admin/AdminOrders';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminAnalytics from './pages/admin/AdminAnalytics';
+import AdminBanners from './pages/admin/AdminBanners';
 import {
   SizeGuidePage,
   ShippingInfoPage,
@@ -72,6 +75,7 @@ function AppRoutes() {
           {/* Auth */}
           <Route path="/login" element={<PageWrapper><LoginPage /></PageWrapper>} />
           <Route path="/register" element={<PageWrapper><RegisterPage /></PageWrapper>} />
+          <Route path="/forgot-password" element={<PageWrapper><ForgotPasswordPage /></PageWrapper>} />
 
           {/* Cart, Wishlist, Search */}
           <Route path="/cart" element={<PageWrapper><CartPage /></PageWrapper>} />
@@ -86,12 +90,14 @@ function AppRoutes() {
           <Route path="/checkout" element={<RequireAuth><PageWrapper><CheckoutPage /></PageWrapper></RequireAuth>} />
 
           {/* Admin */}
-          <Route path="/admin" element={<RequireAuth><AdminLayout /></RequireAuth>}>
+          <Route path="/admin" element={<RequireAuth role="admin"><AdminLayout /></RequireAuth>}>
             <Route index element={<AdminDashboard />} />
             <Route path="products" element={<AdminProducts />} />
+            <Route path="collections" element={<AdminCollections />} />
             <Route path="orders" element={<AdminOrders />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="analytics" element={<AdminAnalytics />} />
+            <Route path="banners" element={<AdminBanners />} />
           </Route>
 
           {/* Shop helpers */}

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { read, write } from '../utils/storage';
+import { read, write, remove } from '../utils/storage';
 import { useAuth } from './AuthContext';
 
 const CartContext = createContext(null);
@@ -53,7 +53,10 @@ export function CartProvider({ children }) {
     setItems((arr) => arr.filter((it) => it._key !== key));
   }, []);
 
-  const clear = useCallback(() => setItems([]), []);
+  const clear = useCallback(() => {
+    setItems([]);
+    remove(key); // directly remove from localStorage to survive quota edge cases
+  }, [key]);
 
   const totals = useMemo(() => {
     const subtotal = items.reduce((s, it) => s + it.price * it.qty, 0);

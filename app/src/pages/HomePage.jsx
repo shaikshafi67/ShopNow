@@ -1,9 +1,12 @@
 import { useRef, useEffect, useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
 import { Sparkles, ArrowRight, ChevronRight, Zap, Shield, RotateCcw, Star, TrendingUp } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
+import HeroBanner from '../components/HeroBanner';
 import { useCatalog } from '../context/CatalogContext';
+import { useBanners } from '../context/BannersContext';
+import { useCollections } from '../context/CollectionsContext';
 
 const HERO_WORDS = ['STYLE', 'FASHION', 'CULTURE', 'IDENTITY'];
 
@@ -46,14 +49,70 @@ export default function HomePage() {
   const heroOpacity = useTransform(scrollY, [0, 400], [1, 0]);
 
   const { byGender, products } = useCatalog();
+  const { activeBanners } = useBanners();
+  const { autoImages, hiddenAutoIds } = useCollections();
+  const navigate = useNavigate();
+  const catScrollRef = useRef(null);
   const featured = useMemo(() => products.filter((p) => p.tag === 'Bestseller' || p.tag === 'Trending').slice(0, 6), [products]);
   const newMen = useMemo(() => byGender('men').slice(0, 4), [byGender]);
   const newWomen = useMemo(() => byGender('women').filter((p) => p.category === 'Dresses' || p.category === 'Tops').slice(0, 4), [byGender]);
 
+  // Build category cards from real catalog data
+  const categoryCards = useMemo(() => {
+    const ACCENT_COLORS = ['#7c6aff', '#3b82f6', '#ff6a9a', '#fb923c', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+    const catMap = {};
+    products.forEach((p) => {
+      const cat = p.category || 'Uncategorized';
+      if (!catMap[cat]) catMap[cat] = [];
+      catMap[cat].push(p);
+    });
+    return Object.entries(catMap)
+      .filter(([cat]) => !hiddenAutoIds.includes(cat))
+      .map(([cat, prods], i) => ({
+        label: cat,
+        count: prods.length,
+        accent: ACCENT_COLORS[i % ACCENT_COLORS.length],
+        img: autoImages[cat] || prods.find((p) => p.images?.[0])?.images?.[0] || null,
+      }));
+  }, [products, autoImages, hiddenAutoIds]);
+
+  // Auto-scroll category strip
+  useEffect(() => {
+    const el = catScrollRef.current;
+    if (!el) return;
+    let animId;
+    let paused = false;
+    const speed = 0.6;
+    const step = () => {
+      if (!paused) {
+        el.scrollLeft += speed;
+        if (el.scrollLeft >= el.scrollWidth - el.clientWidth) el.scrollLeft = 0;
+      }
+      animId = requestAnimationFrame(step);
+    };
+    animId = requestAnimationFrame(step);
+    const pause = () => { paused = true; };
+    const resume = () => { paused = false; };
+    el.addEventListener('mouseenter', pause);
+    el.addEventListener('mouseleave', resume);
+    el.addEventListener('touchstart', pause);
+    el.addEventListener('touchend', resume);
+    return () => {
+      cancelAnimationFrame(animId);
+      el.removeEventListener('mouseenter', pause);
+      el.removeEventListener('mouseleave', resume);
+      el.removeEventListener('touchstart', pause);
+      el.removeEventListener('touchend', resume);
+    };
+  }, []); // runs once after mount — ref is stable
+
   return (
     <div style={{ minHeight: '100vh' }}>
-      {/* HERO */}
-      <section
+      {/* HERO BANNERS */}
+      {activeBanners.length > 0 && <HeroBanner />}
+
+      {/* TEXT HERO — hidden when banners are active */}
+      {activeBanners.length === 0 && <section
         ref={heroRef}
         style={{
           minHeight: '100vh',
@@ -265,7 +324,7 @@ export default function HomePage() {
           <span style={{ fontSize: 11, letterSpacing: '2px', textTransform: 'uppercase' }}>Scroll</span>
           <div style={{ width: 1, height: 40, background: 'linear-gradient(to bottom, var(--text-muted), transparent)' }} />
         </motion.div>
-      </section>
+      </section>}
 
       {/* MARQUEE */}
       <div style={{
@@ -302,77 +361,80 @@ export default function HomePage() {
             <p style={{ color: 'var(--text-secondary)' }}>Curated collections for every style</p>
           </motion.div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
-            {[
-              {
-                label: "Men's T-Shirts", to: '/men', sub: '120+ styles',
-                bg: 'linear-gradient(135deg, rgba(124,106,255,0.2), rgba(124,106,255,0.05))',
-                accent: '#7c6aff',
-                img: '/images/men/tshirt/tshirt_3_1.jpg',
-              },
-              {
-                label: "Men's Shirts", to: '/men', sub: '80+ styles',
-                bg: 'linear-gradient(135deg, rgba(59,130,246,0.2), rgba(59,130,246,0.05))',
-                accent: '#3b82f6',
-                img: '/images/men/shirt/shirt_1_1.jpg',
-              },
-              {
-                label: "Women's Dresses", to: '/women', sub: '200+ styles',
-                bg: 'linear-gradient(135deg, rgba(255,106,154,0.2), rgba(255,106,154,0.05))',
-                accent: '#ff6a9a',
-                img: '/images/women/dress/dress_1_1.jpg',
-              },
-              {
-                label: "Women's Tops", to: '/women', sub: '150+ styles',
-                bg: 'linear-gradient(135deg, rgba(251,146,60,0.2), rgba(251,146,60,0.05))',
-                accent: '#fb923c',
-                img: '/images/women/tops/top_1_1.jpg',
-              },
-            ].map((cat, i) => (
+          {/* Horizontal auto-scroll strip */}
+          <div
+            ref={catScrollRef}
+            style={{
+              display: 'flex',
+              gap: 20,
+              overflowX: 'auto',
+              paddingBottom: 16,
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+              WebkitOverflowScrolling: 'touch',
+              cursor: 'grab',
+            }}
+            onMouseDown={(e) => {
+              const el = e.currentTarget;
+              el.style.cursor = 'grabbing';
+              const startX = e.pageX - el.offsetLeft;
+              const scrollLeft = el.scrollLeft;
+              const onMove = (ev) => { el.scrollLeft = scrollLeft - (ev.pageX - el.offsetLeft - startX); };
+              const onUp = () => { el.style.cursor = 'grab'; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+              window.addEventListener('mousemove', onMove);
+              window.addEventListener('mouseup', onUp);
+            }}
+          >
+            {categoryCards.map((cat, i) => (
               <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
+                key={cat.label}
+                initial={{ opacity: 0, x: 30 }}
+                whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                whileHover={{ y: -6, scale: 1.01 }}
+                transition={{ delay: i * 0.07 }}
+                whileHover={{ y: -6, scale: 1.02 }}
+                style={{ flexShrink: 0, width: 260, cursor: 'pointer' }}
+                onClick={() => navigate(`/search?category=${encodeURIComponent(cat.label)}`)}
               >
-                <Link to={cat.to} style={{ textDecoration: 'none', display: 'block' }}>
-                  <div style={{
-                    borderRadius: 24,
-                    overflow: 'hidden',
-                    border: '1px solid var(--border-glass)',
-                    position: 'relative',
-                    aspectRatio: '3/4',
-                    background: 'var(--bg-card)',
-                    cursor: 'pointer',
-                  }}>
+                <div style={{
+                  borderRadius: 24,
+                  overflow: 'hidden',
+                  border: '1px solid var(--border-glass)',
+                  position: 'relative',
+                  height: 340,
+                  background: 'var(--bg-card)',
+                }}>
+                  {cat.img ? (
                     <img
                       src={cat.img}
                       alt={cat.label}
                       style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform 0.5s ease' }}
-                      onError={e => e.target.style.display = 'none'}
                     />
-                    <div style={{
-                      position: 'absolute',
-                      inset: 0,
-                      background: 'linear-gradient(to top, rgba(5,5,8,0.9) 0%, rgba(5,5,8,0.2) 60%, transparent 100%)',
-                    }} />
-                    <div style={{ position: 'absolute', bottom: 24, left: 24, right: 24 }}>
-                      <p style={{ color: cat.accent, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '2px', marginBottom: 4 }}>{cat.sub}</p>
-                      <h3 style={{ color: 'white', fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, marginBottom: 12 }}>{cat.label}</h3>
-                      <span style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 6,
-                        background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)',
-                        border: '1px solid rgba(255,255,255,0.2)',
-                        borderRadius: 50, padding: '7px 16px',
-                        fontSize: 13, fontWeight: 600, color: 'white',
-                      }}>
-                        Shop Now <ChevronRight size={16} />
-                      </span>
-                    </div>
+                  ) : (
+                    <div style={{ width: '100%', height: '100%', background: `radial-gradient(circle at 60% 40%, ${cat.accent}22, transparent 70%)` }} />
+                  )}
+                  <div style={{
+                    position: 'absolute', inset: 0,
+                    background: 'linear-gradient(to top, rgba(5,5,8,0.88) 0%, rgba(5,5,8,0.15) 55%, transparent 100%)',
+                  }} />
+                  <div style={{ position: 'absolute', bottom: 22, left: 20, right: 20 }}>
+                    <p style={{ color: cat.accent, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '2px', marginBottom: 4 }}>
+                      {cat.count} products
+                    </p>
+                    <h3 style={{ color: 'white', fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, marginBottom: 12, lineHeight: 1.2 }}>
+                      {cat.label}
+                    </h3>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      borderRadius: 50, padding: '6px 14px',
+                      fontSize: 13, fontWeight: 600, color: 'white',
+                    }}>
+                      Shop Now <ChevronRight size={15} />
+                    </span>
                   </div>
-                </Link>
+                </div>
               </motion.div>
             ))}
           </div>

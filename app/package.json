@@ -12,6 +12,7 @@
     "dev:full": "node server/index.js & vite"
   },
   "dependencies": {
+    "@emailjs/browser": "^4.4.1",
     "@google/generative-ai": "^0.24.1",
     "@gradio/client": "^2.2.0",
     "@mediapipe/drawing_utils": "^0.3.1675466124",

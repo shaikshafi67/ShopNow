@@ -171,14 +171,23 @@ export default function RazorpayModal({ open, amount, user, onSuccess, onClose }
   // Demo mode payment
   const handleDemoPay = async () => {
     if (!validateDemo()) return;
+    await processPay(method);
+  };
+
+  const handleCodPay = async () => {
+    setMethod('cod');
+    await processPay('cod');
+  };
+
+  const processPay = async (payMethod) => {
     setStage('processing');
     await new Promise((r) => setTimeout(r, 1500));
     setStage('success');
     await new Promise((r) => setTimeout(r, 1800));
     const txnId = 'pay_demo_' + Math.random().toString(36).slice(2, 14).toUpperCase();
     onSuccess({
-      method,
-      status: method === 'cod' ? 'pending' : 'paid',
+      method: payMethod,
+      status: payMethod === 'cod' ? 'pending' : 'paid',
       txnId,
       gateway: 'razorpay_demo',
     });
@@ -305,6 +314,12 @@ export default function RazorpayModal({ open, amount, user, onSuccess, onClose }
                   <p style={{ color: '#999', fontSize: 11, marginTop: 12 }}>
                     Razorpay Test Mode • Use test card: 4111 1111 1111 1111
                   </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '16px 0 4px', color: '#bbb', fontSize: 12 }}>
+                    <div style={{ flex: 1, height: 1, background: '#eee' }} /> or <div style={{ flex: 1, height: 1, background: '#eee' }} />
+                  </div>
+                  <button onClick={handleCodPay} style={{ ...payBtn, background: 'linear-gradient(135deg, #F57C00 0%, #E65100 100%)', marginTop: 8 }}>
+                    <Truck size={16} /> Cash on Delivery
+                  </button>
                 </motion.div>
               )}
 
@@ -415,12 +430,15 @@ export default function RazorpayModal({ open, amount, user, onSuccess, onClose }
                     )}
 
                     <button onClick={handleDemoPay} style={payBtn}>
-                      Pay {inr(amount)} <ChevronRight size={16} />
+                      {method === 'cod' ? <Truck size={16} /> : <ChevronRight size={16} />}
+                      {method === 'cod' ? 'Confirm Order' : `Pay ${inr(amount)}`}
                     </button>
 
-                    <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 11, color: '#999' }}>
-                      <Shield size={11} /> Demo mode — No real payment charged
-                    </div>
+                    {method !== 'cod' && (
+                      <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 11, color: '#999' }}>
+                        <Shield size={11} /> Demo mode — No real payment charged
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               )}
@@ -452,11 +470,15 @@ export default function RazorpayModal({ open, amount, user, onSuccess, onClose }
                 <motion.div key="success" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
                   style={{ padding: '60px 24px', textAlign: 'center' }}>
                   <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 200 }}
-                    style={{ width: 72, height: 72, borderRadius: '50%', background: '#E8F5E9', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
-                    <CheckCircle size={38} color="#2E7D32" />
+                    style={{ width: 72, height: 72, borderRadius: '50%', background: method === 'cod' ? '#FFF8E1' : '#E8F5E9', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+                    {method === 'cod' ? <Truck size={38} color="#F57C00" /> : <CheckCircle size={38} color="#2E7D32" />}
                   </motion.div>
-                  <h3 style={{ fontSize: 22, fontWeight: 800, color: '#2E7D32', marginBottom: 8 }}>Payment Successful</h3>
-                  <p style={{ color: '#666', fontSize: 15 }}>{inr(amount)} paid successfully</p>
+                  <h3 style={{ fontSize: 22, fontWeight: 800, color: method === 'cod' ? '#E65100' : '#2E7D32', marginBottom: 8 }}>
+                    {method === 'cod' ? 'Order Placed!' : 'Payment Successful'}
+                  </h3>
+                  <p style={{ color: '#666', fontSize: 15 }}>
+                    {method === 'cod' ? `Pay ${inr(amount)} on delivery` : `${inr(amount)} paid successfully`}
+                  </p>
                   <p style={{ color: '#999', fontSize: 13, marginTop: 8 }}>Redirecting to order confirmation...</p>
                 </motion.div>
               )}

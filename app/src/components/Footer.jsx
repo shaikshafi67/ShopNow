@@ -1,8 +1,25 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Sparkles, Share2, X as XIcon, Music2, Mail, ArrowRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Sparkles, Share2, X as XIcon, Music2, ArrowRight, CheckCircle } from 'lucide-react';
 
 export default function Footer() {
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState('idle'); // idle | success | error
+
+  const handleSubscribe = (e) => {
+    e.preventDefault();
+    const trimmed = email.trim();
+    if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setStatus('error');
+      setTimeout(() => setStatus('idle'), 2500);
+      return;
+    }
+    setStatus('success');
+    setEmail('');
+    setTimeout(() => setStatus('idle'), 4000);
+  };
+
   return (
     <footer style={{
       background: 'var(--bg-secondary)',
@@ -37,25 +54,60 @@ export default function Footer() {
               Join 50,000+ fashion-forward subscribers. No spam, ever.
             </p>
           </div>
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <input
-              placeholder="your@email.com"
-              style={{
-                background: 'var(--bg-glass)',
-                border: '1px solid var(--border-glass)',
-                borderRadius: 50,
-                padding: '12px 20px',
-                color: 'var(--text-primary)',
-                fontSize: 14,
-                outline: 'none',
-                width: 240,
-                fontFamily: 'var(--font-body)',
-              }}
-            />
-            <button className="btn btn-primary" style={{ gap: 8 }}>
-              Subscribe <ArrowRight size={16} />
-            </button>
-          </div>
+          <AnimatePresence mode="wait">
+            {status === 'success' ? (
+              <motion.div
+                key="success"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  color: '#22c55e', fontWeight: 700, fontSize: 15,
+                }}
+              >
+                <CheckCircle size={22} /> You're subscribed!
+              </motion.div>
+            ) : (
+              <motion.form
+                key="form"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onSubmit={handleSubscribe}
+                style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
+              >
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => { setEmail(e.target.value); if (status === 'error') setStatus('idle'); }}
+                    placeholder="your@email.com"
+                    style={{
+                      background: 'var(--bg-glass)',
+                      border: `1px solid ${status === 'error' ? '#ef4444' : 'var(--border-glass)'}`,
+                      borderRadius: 50,
+                      padding: '12px 20px',
+                      color: 'var(--text-primary)',
+                      fontSize: 14,
+                      outline: 'none',
+                      width: 240,
+                      fontFamily: 'var(--font-body)',
+                      transition: 'border-color 0.2s',
+                    }}
+                  />
+                  <button type="submit" className="btn btn-primary" style={{ gap: 8 }}>
+                    Subscribe <ArrowRight size={16} />
+                  </button>
+                </div>
+                {status === 'error' && (
+                  <span style={{ fontSize: 12, color: '#ef4444', paddingLeft: 20 }}>
+                    Enter a valid email address
+                  </span>
+                )}
+              </motion.form>
+            )}
+          </AnimatePresence>
         </motion.div>
 
         {/* Main footer grid */}

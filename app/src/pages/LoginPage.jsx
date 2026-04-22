@@ -25,7 +25,13 @@ export default function LoginPage() {
     try {
       const u = await login(form);
       toast.success(`Welcome back, ${u.name.split(' ')[0]}.`);
-      navigate(redirectTo, { replace: true });
+      // Admin always goes to admin panel; regular users never land on admin pages
+      const isAdminRoute = redirectTo.startsWith('/admin');
+      let destination;
+      if (u.role === 'admin') destination = '/admin';
+      else if (isAdminRoute) destination = '/';
+      else destination = redirectTo;
+      navigate(destination, { replace: true });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -82,19 +88,9 @@ export default function LoginPage() {
           <LogIn size={16} /> {busy ? 'Signing in…' : 'Sign in'}
         </button>
 
-        <div style={{
-          marginTop: 20,
-          padding: 14,
-          background: 'var(--bg-glass)',
-          border: '1px dashed var(--border-glass)',
-          borderRadius: 10,
-          fontSize: 12,
-          color: 'var(--text-secondary)',
-          textAlign: 'center',
-          lineHeight: 1.6,
-        }}>
-          Admin demo — <code style={{ color: 'var(--accent)' }}>admin@shopnow.local</code> / <code style={{ color: 'var(--accent)' }}>admin123</code>
-        </div>
+        <p style={{ marginTop: 16, textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>
+          <Link to="/forgot-password" style={{ color: 'var(--accent)', fontWeight: 600 }}>Forgot password?</Link>
+        </p>
       </form>
     </AuthShell>
   );

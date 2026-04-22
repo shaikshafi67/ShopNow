@@ -1,16 +1,19 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Heart, ShoppingBag, Sparkles, Star } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import { useToast } from '../context/ToastContext';
 import { inr } from '../utils/format';
 
 export default function ProductCard({ product, index = 0 }) {
   const { add: addToCart } = useCart();
+  const { user } = useAuth();
   const { has, toggle: toggleWishlist } = useWishlist();
   const toast = useToast();
+  const navigate = useNavigate();
   const [hovered, setHovered] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [addedAnim, setAddedAnim] = useState(false);
@@ -25,6 +28,10 @@ export default function ProductCard({ product, index = 0 }) {
 
   const handleAddToCart = (e) => {
     e.preventDefault();
+    if (!user) {
+      navigate('/login', { state: { from: `/product/${product.id}` } });
+      return;
+    }
     addToCart(product, { size: product.sizes?.[0] || null, qty: 1 });
     toast.success('Added to bag');
     setAddedAnim(true);

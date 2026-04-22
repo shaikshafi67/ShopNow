@@ -12,6 +12,8 @@ import { OrdersProvider } from './context/OrdersContext'
 import { ReviewsProvider } from './context/ReviewsContext'
 import { NotifProvider } from './context/NotifContext'
 import { LangProvider } from './context/LangContext'
+import { BannersProvider } from './context/BannersContext'
+import { CollectionsProvider } from './context/CollectionsContext'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -25,7 +27,11 @@ createRoot(document.getElementById('root')).render(
                   <OrdersProvider>
                     <ReviewsProvider>
                       <NotifProvider>
-                        <App />
+                        <BannersProvider>
+                          <CollectionsProvider>
+                            <App />
+                          </CollectionsProvider>
+                        </BannersProvider>
                       </NotifProvider>
                     </ReviewsProvider>
                   </OrdersProvider>

@@ -1,14 +1,21 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Package, ShoppingCart, Users, BarChart2, LogOut, Sparkles, ChevronRight } from 'lucide-react';
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { LayoutDashboard, Package, Layers, ShoppingCart, Users, BarChart2, LogOut, Sparkles, ChevronRight, Image } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 
 const LINKS = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/admin/products', label: 'Products', icon: Package },
+  {
+    label: 'Products', icon: Package, group: true,
+    children: [
+      { to: '/admin/products', label: 'All products' },
+      { to: '/admin/collections', label: 'Collections' },
+    ],
+  },
   { to: '/admin/orders', label: 'Orders', icon: ShoppingCart },
   { to: '/admin/users', label: 'Users', icon: Users },
   { to: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
+  { to: '/admin/banners', label: 'Banners', icon: Image },
 ];
 
 export default function AdminLayout() {
@@ -37,23 +44,44 @@ export default function AdminLayout() {
         </div>
 
         <nav style={{ flex: 1, padding: '12px 10px' }}>
-          {LINKS.map(({ to, label, icon: Icon, end }) => (
-            <NavLink
-              key={to} to={to} end={end}
-              style={({ isActive }) => ({
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '10px 12px', borderRadius: 10, marginBottom: 4,
-                textDecoration: 'none', fontSize: 14, fontWeight: isActive ? 700 : 500,
-                color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
-                background: isActive ? 'rgba(124,106,255,0.1)' : 'transparent',
-                transition: 'all var(--transition)',
-              })}
-              onMouseEnter={(e) => { if (!e.currentTarget.classList.contains('active')) e.currentTarget.style.background = 'var(--bg-glass)'; }}
-              onMouseLeave={(e) => { if (!e.currentTarget.classList.contains('active')) e.currentTarget.style.background = 'transparent'; }}
-            >
-              <Icon size={17} /> {label}
-            </NavLink>
-          ))}
+          {LINKS.map((link) => {
+            if (link.group) {
+              return (
+                <div key={link.label}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', color: 'var(--text-secondary)', fontSize: 14, fontWeight: 600 }}>
+                    <link.icon size={17} /> {link.label}
+                  </div>
+                  {link.children.map((child) => (
+                    <NavLink key={child.to} to={child.to}
+                      style={({ isActive }) => ({
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '8px 12px 8px 36px', borderRadius: 10, marginBottom: 2,
+                        textDecoration: 'none', fontSize: 13, fontWeight: isActive ? 700 : 500,
+                        color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
+                        background: isActive ? 'rgba(124,106,255,0.1)' : 'transparent',
+                        transition: 'all var(--transition)',
+                      })}
+                    >{child.label}</NavLink>
+                  ))}
+                </div>
+              );
+            }
+            const Icon = link.icon;
+            return (
+              <NavLink key={link.to} to={link.to} end={link.end}
+                style={({ isActive }) => ({
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '10px 12px', borderRadius: 10, marginBottom: 4,
+                  textDecoration: 'none', fontSize: 14, fontWeight: isActive ? 700 : 500,
+                  color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
+                  background: isActive ? 'rgba(124,106,255,0.1)' : 'transparent',
+                  transition: 'all var(--transition)',
+                })}
+              >
+                <Icon size={17} /> {link.label}
+              </NavLink>
+            );
+          })}
         </nav>
 
         <div style={{ padding: '12px 10px', borderTop: '1px solid var(--border-glass)' }}>

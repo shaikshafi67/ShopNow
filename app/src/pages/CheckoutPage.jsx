@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useRef, useState, useMemo } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, MapPin, CreditCard, ChevronRight, Truck, Lock } from 'lucide-react';
@@ -25,11 +25,14 @@ export default function CheckoutPage() {
   const [newAddr, setNewAddr] = useState({ label: 'Home', name: user?.name || '', phone: user?.phone || '', line1: '', line2: '', city: '', state: '', pincode: '' });
   const [savingAddress, setSavingAddress] = useState((user?.addresses || []).length === 0);
   const [razorpayOpen, setRazorpayOpen] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('razorpay'); // 'razorpay' | 'cod'
+  // Prevents the items===0 guard from redirecting to /cart after order is placed
+  const orderPlaced = useRef(false);
 
   if (!user) {
     return <Navigate to="/login" replace state={{ from: '/checkout' }} />;
   }
-  if (items.length === 0) {
+  if (items.length === 0 && !orderPlaced.current) {
     return <Navigate to="/cart" replace />;
   }
 
@@ -61,8 +64,15 @@ export default function CheckoutPage() {
     setRazorpayOpen(true);
   };
 
+  const placeCOD = () => {
+    const txnId = 'cod_' + Math.random().toString(36).slice(2, 14).toUpperCase();
+    handlePaymentSuccess({ method: 'cod', status: 'pending', txnId, gateway: 'cod' });
+  };
+
   const handlePaymentSuccess = (paymentData) => {
     setRazorpayOpen(false);
+    // Must be set before clear() so the items===0 guard doesn't redirect to /cart
+    orderPlaced.current = true;
 
     const order = placeOrder({
       items,
@@ -80,8 +90,16 @@ export default function CheckoutPage() {
       link: `/orders/${order.id}`,
     });
 
-    toast.success('Order placed successfully!');
-    navigate(`/orders/${order.id}?placed=1`, { replace: true });
+    navigate('/orders', {
+      replace: true,
+      state: {
+        justPlaced: true,
+        orderId: order.id,
+        orderNumber: order.number,
+        paymentMethod: paymentData.method,
+        total: totals.total,
+      },
+    });
   };
 
   return (
@@ -175,53 +193,90 @@ export default function CheckoutPage() {
                 >
                   <h2 style={cardHeading()}><CreditCard size={18} color="var(--accent)" /> Payment</h2>
 
-                  {/* Razorpay payment card */}
+                  {/* Amount banner */}
                   <div style={{
                     background: 'linear-gradient(135deg, #2B3A67 0%, #1A237E 100%)',
-                    borderRadius: 14, padding: '24px 22px', marginBottom: 18, color: 'white',
+                    borderRadius: 14, padding: '20px 22px', marginBottom: 22, color: 'white',
                     position: 'relative', overflow: 'hidden',
                   }}>
-                    <div style={{
-                      position: 'absolute', width: 200, height: 200, borderRadius: '50%',
-                      background: 'rgba(255,255,255,0.05)', right: -60, top: -60,
-                    }} />
-                    <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>
-                      Total Amount
-                    </div>
-                    <div style={{ fontSize: 32, fontWeight: 900, fontFamily: 'var(--font-display)', marginBottom: 16 }}>
-                      {inr(totals.total)}
-                    </div>
+                    <div style={{ position: 'absolute', width: 200, height: 200, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', right: -60, top: -60 }} />
+                    <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>Total Amount</div>
+                    <div style={{ fontSize: 32, fontWeight: 900, fontFamily: 'var(--font-display)', marginBottom: 12 }}>{inr(totals.total)}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, opacity: 0.8 }}>
-                      <Lock size={14} />
-                      <span>Payments are secured by <strong>Razorpay</strong></span>
+                      <Lock size={14} /> Secured checkout
                     </div>
                   </div>
 
-                  <p style={{ color: 'var(--text-secondary)', fontSize: 14, lineHeight: 1.7, marginBottom: 18 }}>
-                    Click below to open the secure Razorpay payment gateway. You can pay using UPI, Credit/Debit Cards, Netbanking, or Wallets.
-                  </p>
+                  {/* Payment method selector */}
+                  <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 12 }}>Choose payment method</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 22 }}>
+                    {/* Razorpay option */}
+                    <button
+                      onClick={() => setPaymentMethod('razorpay')}
+                      style={{
+                        padding: '14px 16px', borderRadius: 12, cursor: 'pointer',
+                        border: `2px solid ${paymentMethod === 'razorpay' ? 'var(--accent)' : 'var(--border-glass)'}`,
+                        background: paymentMethod === 'razorpay' ? 'rgba(124,106,255,0.06)' : 'var(--bg-glass)',
+                        display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6,
+                        transition: 'all 0.2s', fontFamily: 'var(--font-body)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <CreditCard size={18} color={paymentMethod === 'razorpay' ? 'var(--accent)' : 'var(--text-secondary)'} />
+                        <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>Pay Online</span>
+                      </div>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'left' }}>UPI, Cards, Netbanking, Wallets</span>
+                    </button>
 
-                  <div style={{
-                    background: 'var(--bg-glass)', border: '1px dashed var(--border-glass)',
-                    borderRadius: 10, padding: 12, fontSize: 12, color: 'var(--text-muted)',
-                    display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18,
-                  }}>
-                    <Lock size={14} /> Payments are secured by Razorpay. Auto-detects live/demo mode.
+                    {/* COD option */}
+                    <button
+                      onClick={() => setPaymentMethod('cod')}
+                      style={{
+                        padding: '14px 16px', borderRadius: 12, cursor: 'pointer',
+                        border: `2px solid ${paymentMethod === 'cod' ? '#f97316' : 'var(--border-glass)'}`,
+                        background: paymentMethod === 'cod' ? 'rgba(249,115,22,0.06)' : 'var(--bg-glass)',
+                        display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6,
+                        transition: 'all 0.2s', fontFamily: 'var(--font-body)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Truck size={18} color={paymentMethod === 'cod' ? '#f97316' : 'var(--text-secondary)'} />
+                        <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>Cash on Delivery</span>
+                      </div>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'left' }}>Pay {inr(totals.total)} on delivery</span>
+                    </button>
                   </div>
+
+                  {/* COD info */}
+                  {paymentMethod === 'cod' && (
+                    <div style={{
+                      background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.25)',
+                      borderRadius: 10, padding: '12px 14px', marginBottom: 18,
+                      fontSize: 13, color: '#92400e', lineHeight: 1.6,
+                    }}>
+                      A delivery agent will collect <strong>{inr(totals.total)}</strong> in cash when your order arrives. Please keep exact change ready.
+                    </div>
+                  )}
 
                   <div style={{ display: 'flex', gap: 10 }}>
                     <button onClick={() => setStep(1)} className="btn btn-ghost" style={{ flex: '0 0 auto' }}>Back</button>
-                    <button
-                      onClick={openRazorpay}
-                      className="btn btn-primary"
-                      style={{
-                        flex: 1, justifyContent: 'center',
-                        background: 'linear-gradient(135deg, #2B3A67 0%, #1A237E 100%)',
-                        border: 'none',
-                      }}
-                    >
-                      Pay with Razorpay <CreditCard size={16} />
-                    </button>
+                    {paymentMethod === 'razorpay' ? (
+                      <button
+                        onClick={openRazorpay}
+                        className="btn btn-primary"
+                        style={{ flex: 1, justifyContent: 'center', background: 'linear-gradient(135deg, #2B3A67 0%, #1A237E 100%)', border: 'none' }}
+                      >
+                        Pay with Razorpay <CreditCard size={16} />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={placeCOD}
+                        className="btn btn-primary"
+                        style={{ flex: 1, justifyContent: 'center', background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)', border: 'none' }}
+                      >
+                        <Truck size={16} /> Place Order — Pay on Delivery
+                      </button>
+                    )}
                   </div>
                 </motion.section>
               )}

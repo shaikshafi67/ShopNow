@@ -43,10 +43,19 @@ function publicUser(u) {
 
 export function AuthProvider({ children }) {
   const [users, setUsers] = useState(loadUsers);
-  const [sessionId, setSessionId] = useState(() => read('session', null));
+  const [sessionId, setSessionId] = useState(() => {
+    try { return sessionStorage.getItem('shopnow:session') || null; }
+    catch { return null; }
+  });
 
   useEffect(() => { write('users', users); }, [users]);
-  useEffect(() => { write('session', sessionId); }, [sessionId]);
+
+  useEffect(() => {
+    try {
+      if (sessionId) sessionStorage.setItem('shopnow:session', sessionId);
+      else sessionStorage.removeItem('shopnow:session');
+    } catch { /* ignore */ }
+  }, [sessionId]);
 
   const user = useMemo(
     () => publicUser(users.find((u) => u.id === sessionId)),
@@ -109,6 +118,20 @@ export function AuthProvider({ children }) {
       : u)));
   }, [user]);
 
+  const findByEmail = useCallback((email) => {
+    const clean = (email || '').trim().toLowerCase();
+    return users.find((u) => u.email === clean) || null;
+  }, [users]);
+
+  const resetPassword = useCallback(async (email, newPassword) => {
+    const clean = (email || '').trim().toLowerCase();
+    const found = users.find((u) => u.email === clean);
+    if (!found) throw new Error('No account found with this email.');
+    if (!newPassword || newPassword.length < 6) throw new Error('Password must be at least 6 characters.');
+    const passwordHash = await sha256(newPassword);
+    setUsers((arr) => arr.map((u) => (u.email === clean ? { ...u, passwordHash } : u)));
+  }, [users]);
+
   const allUsers = useMemo(() => users.map(publicUser), [users]);
 
   const value = {
@@ -121,6 +144,8 @@ export function AuthProvider({ children }) {
     updateProfile,
     addAddress,
     removeAddress,
+    findByEmail,
+    resetPassword,
     allUsers,
   };
 
