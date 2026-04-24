@@ -27,6 +27,7 @@ import AdminOrders from './pages/admin/AdminOrders';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminAnalytics from './pages/admin/AdminAnalytics';
 import AdminBanners from './pages/admin/AdminBanners';
+import AdminDiscounts from './pages/admin/AdminDiscounts';
 import {
   SizeGuidePage,
   ShippingInfoPage,
@@ -98,6 +99,7 @@ function AppRoutes() {
             <Route path="users" element={<AdminUsers />} />
             <Route path="analytics" element={<AdminAnalytics />} />
             <Route path="banners" element={<AdminBanners />} />
+            <Route path="discounts" element={<AdminDiscounts />} />
           </Route>
 
           {/* Shop helpers */}

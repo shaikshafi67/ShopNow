@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Package, Layers, ShoppingCart, Users, BarChart2, LogOut, Sparkles, ChevronRight, Image } from 'lucide-react';
+import { LayoutDashboard, Package, Layers, ShoppingCart, Users, BarChart2, LogOut, Sparkles, ChevronRight, Image, Tag } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 
@@ -13,6 +13,7 @@ const LINKS = [
     ],
   },
   { to: '/admin/orders', label: 'Orders', icon: ShoppingCart },
+  { to: '/admin/discounts', label: 'Discounts', icon: Tag },
   { to: '/admin/users', label: 'Users', icon: Users },
   { to: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
   { to: '/admin/banners', label: 'Banners', icon: Image },

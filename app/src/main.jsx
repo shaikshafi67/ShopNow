@@ -14,6 +14,7 @@ import { NotifProvider } from './context/NotifContext'
 import { LangProvider } from './context/LangContext'
 import { BannersProvider } from './context/BannersContext'
 import { CollectionsProvider } from './context/CollectionsContext'
+import { DiscountsProvider } from './context/DiscountsContext'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -29,7 +30,9 @@ createRoot(document.getElementById('root')).render(
                       <NotifProvider>
                         <BannersProvider>
                           <CollectionsProvider>
-                            <App />
+                            <DiscountsProvider>
+                              <App />
+                            </DiscountsProvider>
                           </CollectionsProvider>
                         </BannersProvider>
                       </NotifProvider>

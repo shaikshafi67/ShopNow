@@ -1,13 +1,14 @@
 import { useRef, useState, useMemo } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, MapPin, CreditCard, ChevronRight, Truck, Lock } from 'lucide-react';
+import { CheckCircle, MapPin, CreditCard, ChevronRight, Truck, Lock, Tag, X as XIcon } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useOrders } from '../context/OrdersContext';
 import { useCatalog } from '../context/CatalogContext';
 import { useToast } from '../context/ToastContext';
 import { useNotifications } from '../context/NotifContext';
+import { useDiscounts } from '../context/DiscountsContext';
 import { inr, shortDate, addDays } from '../utils/format';
 import RazorpayModal from '../components/RazorpayModal';
 
@@ -18,7 +19,38 @@ export default function CheckoutPage() {
   const { decrementStock } = useCatalog();
   const toast = useToast();
   const notif = useNotifications();
+  const { applyCode, incrementUsed } = useDiscounts();
   const navigate = useNavigate();
+
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null); // { discount, amount }
+  const [couponError, setCouponError] = useState('');
+
+  const couponDiscount = appliedCoupon?.amount || 0;
+  const finalTotals = useMemo(() => ({
+    ...totals,
+    couponDiscount,
+    total: Math.max(0, totals.total - couponDiscount),
+  }), [totals, couponDiscount]);
+
+  const handleApplyCoupon = () => {
+    if (!couponInput.trim()) return;
+    const result = applyCode(couponInput.trim(), totals.subtotal);
+    if (!result.valid) {
+      setCouponError(result.error);
+      setAppliedCoupon(null);
+    } else {
+      setAppliedCoupon(result);
+      setCouponError('');
+      toast.success(`Coupon applied! You save ${inr(result.amount)}`);
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput('');
+    setCouponError('');
+  };
 
   const [step, setStep] = useState(1);
   const [selectedAddrId, setSelectedAddrId] = useState((user?.addresses || [])[0]?.id || null);
@@ -74,9 +106,13 @@ export default function CheckoutPage() {
     // Must be set before clear() so the items===0 guard doesn't redirect to /cart
     orderPlaced.current = true;
 
+    if (appliedCoupon?.discount?.id) {
+      incrementUsed(appliedCoupon.discount.id);
+    }
+
     const order = placeOrder({
       items,
-      totals,
+      totals: finalTotals,
       address: selectedAddress,
       payment: paymentData,
     });
@@ -97,7 +133,7 @@ export default function CheckoutPage() {
         orderId: order.id,
         orderNumber: order.number,
         paymentMethod: paymentData.method,
-        total: totals.total,
+        total: finalTotals.total,
       },
     });
   };
@@ -201,7 +237,7 @@ export default function CheckoutPage() {
                   }}>
                     <div style={{ position: 'absolute', width: 200, height: 200, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', right: -60, top: -60 }} />
                     <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>Total Amount</div>
-                    <div style={{ fontSize: 32, fontWeight: 900, fontFamily: 'var(--font-display)', marginBottom: 12 }}>{inr(totals.total)}</div>
+                    <div style={{ fontSize: 32, fontWeight: 900, fontFamily: 'var(--font-display)', marginBottom: 12 }}>{inr(finalTotals.total)}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, opacity: 0.8 }}>
                       <Lock size={14} /> Secured checkout
                     </div>
@@ -243,7 +279,7 @@ export default function CheckoutPage() {
                         <Truck size={18} color={paymentMethod === 'cod' ? '#f97316' : 'var(--text-secondary)'} />
                         <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>Cash on Delivery</span>
                       </div>
-                      <span style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'left' }}>Pay {inr(totals.total)} on delivery</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'left' }}>Pay {inr(finalTotals.total)} on delivery</span>
                     </button>
                   </div>
 
@@ -254,7 +290,7 @@ export default function CheckoutPage() {
                       borderRadius: 10, padding: '12px 14px', marginBottom: 18,
                       fontSize: 13, color: '#92400e', lineHeight: 1.6,
                     }}>
-                      A delivery agent will collect <strong>{inr(totals.total)}</strong> in cash when your order arrives. Please keep exact change ready.
+                      A delivery agent will collect <strong>{inr(finalTotals.total)}</strong> in cash when your order arrives. Please keep exact change ready.
                     </div>
                   )}
 
@@ -305,13 +341,67 @@ export default function CheckoutPage() {
               ))}
             </div>
 
+            {/* Coupon code */}
+            <div style={{ margin: '14px 0', borderTop: '1px solid var(--border-glass)', paddingTop: 14 }}>
+              {appliedCoupon ? (
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.3)',
+                  borderRadius: 10, padding: '10px 12px',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Tag size={14} color="#22c55e" />
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#16a34a' }}>
+                        {appliedCoupon.discount.code}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#16a34a' }}>
+                        -{inr(appliedCoupon.amount)} saved
+                      </div>
+                    </div>
+                  </div>
+                  <button onClick={removeCoupon} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#16a34a' }}>
+                    <XIcon size={15} />
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      value={couponInput}
+                      onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); setCouponError(''); }}
+                      onKeyDown={(e) => e.key === 'Enter' && handleApplyCoupon()}
+                      placeholder="Discount code"
+                      style={{
+                        flex: 1, background: 'var(--bg-glass)', border: `1px solid ${couponError ? '#ef4444' : 'var(--border-glass)'}`,
+                        borderRadius: 10, padding: '9px 12px', color: 'var(--text-primary)',
+                        fontSize: 13, fontFamily: 'monospace', outline: 'none', letterSpacing: 1,
+                      }}
+                    />
+                    <button
+                      onClick={handleApplyCoupon}
+                      style={{
+                        padding: '9px 14px', borderRadius: 10, background: 'var(--accent)',
+                        color: 'white', border: 'none', fontFamily: 'var(--font-body)',
+                        fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+                      }}
+                    >Apply</button>
+                  </div>
+                  {couponError && (
+                    <p style={{ fontSize: 12, color: '#ef4444', marginTop: 6 }}>{couponError}</p>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div style={{ borderTop: '1px solid var(--border-glass)', paddingTop: 12 }}>
-              <Row label="Subtotal" value={inr(totals.subtotal)} />
-              {totals.savings > 0 && <Row label="Discount" value={`- ${inr(totals.savings)}`} accent="#22c55e" />}
-              <Row label="Shipping" value={totals.shipping === 0 ? 'FREE' : inr(totals.shipping)} accent={totals.shipping === 0 ? '#22c55e' : undefined} />
-              <Row label="Tax" value={inr(totals.tax)} />
+              <Row label="Subtotal" value={inr(finalTotals.subtotal)} />
+              {finalTotals.savings > 0 && <Row label="Product discount" value={`- ${inr(finalTotals.savings)}`} accent="#22c55e" />}
+              {couponDiscount > 0 && <Row label={`Coupon (${appliedCoupon.discount.code})`} value={`- ${inr(couponDiscount)}`} accent="#22c55e" />}
+              <Row label="Shipping" value={finalTotals.shipping === 0 ? 'FREE' : inr(finalTotals.shipping)} accent={finalTotals.shipping === 0 ? '#22c55e' : undefined} />
+              <Row label="Tax" value={inr(finalTotals.tax)} />
               <div style={{ borderTop: '1px solid var(--border-glass)', margin: '10px 0' }} />
-              <Row label="Total" value={inr(totals.total)} bold />
+              <Row label="Total" value={inr(finalTotals.total)} bold />
             </div>
 
             <p style={{ marginTop: 12, color: 'var(--text-secondary)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -323,7 +413,7 @@ export default function CheckoutPage() {
 
       <RazorpayModal
         open={razorpayOpen}
-        amount={totals.total}
+        amount={finalTotals.total}
         user={user}
         onSuccess={handlePaymentSuccess}
         onClose={() => setRazorpayOpen(false)}
