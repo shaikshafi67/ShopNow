@@ -1,66 +1,47 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { get, set } from '../utils/idb';
+import { supabase } from '../lib/supabase';
 
 const PromoContext = createContext(null);
 export function usePromo() {
   const ctx = useContext(PromoContext);
-  if (!ctx) throw new Error('usePromo must be inside PromoProvider');
+  if (!ctx) throw new Error('usePromo must be used within PromoProvider');
   return ctx;
 }
 
-const KEY = 'shopnow:promos';
-
-const DEFAULT = {
-  home: {
-    active: true,
-    badge: 'Flash Sale · Limited Time',
-    headline: '50% OFF',
-    subline: 'SELECTED STYLES',
-    code: 'SAVE10',
-    btn1Label: 'Shop Sale Now',
-    btn1Link: '/sale',
-    btn2Label: 'New Arrivals →',
-    btn2Link: '/new-arrivals',
-  },
-  men: {
-    active: true,
-    title: "Men's Sale — Up to 40% Off",
-    subtitle: 'Limited stock · Code',
-    code: 'SAVE10',
-    btnLabel: 'Shop Sale',
-  },
-  women: {
-    active: true,
-    title: "Women's Sale — Up to 50% Off",
-    subtitle: 'Limited stock · Code',
-    code: 'SAVE10',
-    btnLabel: 'Shop Sale',
-  },
+const DEFAULTS = {
+  home:   { active: false, badge: 'Flash Sale', headline: '50% OFF', subline: 'SELECTED STYLES', code: '', btn1Label: 'Shop Men', btn1Link: '/men', btn2Label: 'Shop Women', btn2Link: '/women' },
+  men:    { active: false, title: "Men's Sale", subtitle: 'Limited time offer', code: '', btnLabel: 'Shop Now' },
+  women:  { active: false, title: "Women's Sale", subtitle: 'Limited time offer', code: '', btnLabel: 'Shop Now' },
 };
 
 export function PromoProvider({ children }) {
-  const [promos, setPromos] = useState(DEFAULT);
+  const [promos, setPromos] = useState(DEFAULTS);
 
   useEffect(() => {
-    get(KEY).then(stored => {
-      if (stored) setPromos(prev => ({
-        home:   { ...prev.home,   ...(stored.home   || {}) },
-        men:    { ...prev.men,    ...(stored.men    || {}) },
-        women:  { ...prev.women,  ...(stored.women  || {}) },
-      }));
-    }).catch(() => {});
-  }, []);
-
-  const updatePromo = useCallback((page, patch) => {
-    setPromos(prev => {
-      const next = { ...prev, [page]: { ...prev[page], ...patch } };
-      set(KEY, next).catch(() => {});
-      return next;
+    supabase.from('promos').select('*').then(({ data }) => {
+      if (!data) return;
+      const next = { ...DEFAULTS };
+      data.forEach(row => { if (next[row.id] !== undefined) next[row.id] = { ...DEFAULTS[row.id], ...row.data, active: row.is_active }; });
+      setPromos(next);
     });
   }, []);
 
+  const savePromos = useCallback(async (newPromos) => {
+    const rows = Object.entries(newPromos).map(([id, promo]) => {
+      const { active, ...data } = promo;
+      return { id, is_active: active, data, updated_at: new Date().toISOString() };
+    });
+    await supabase.from('promos').upsert(rows);
+    setPromos(newPromos);
+  }, []);
+
+  const updatePromo = useCallback(async (page, updates) => {
+    const updated = { ...promos, [page]: { ...promos[page], ...updates } };
+    await savePromos(updated);
+  }, [promos, savePromos]);
+
   return (
-    <PromoContext.Provider value={{ promos, updatePromo }}>
+    <PromoContext.Provider value={{ promos, savePromos, updatePromo }}>
       {children}
     </PromoContext.Provider>
   );

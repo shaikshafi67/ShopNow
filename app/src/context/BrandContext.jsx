@@ -1,57 +1,52 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { get, set } from '../utils/idb';
+import { supabase } from '../lib/supabase';
 
 const BrandContext = createContext(null);
-
 export function useBrand() {
   const ctx = useContext(BrandContext);
   if (!ctx) throw new Error('useBrand must be used within BrandProvider');
   return ctx;
 }
 
-const BRAND_KEY = 'shopnow:brand';
-const DEFAULT = {
-  logoUrl: '/Logo.png',
-  brandName: 'ShopNow',
-  socials: { facebook: '', instagram: '', youtube: '' },
-};
+const DEFAULT = { logoUrl: '/Logo.png', brandName: 'ShopNow', socials: { facebook: '', instagram: '', youtube: '' } };
 
 export function BrandProvider({ children }) {
   const [brand, setBrand] = useState(DEFAULT);
 
   useEffect(() => {
-    get(BRAND_KEY).then(stored => {
-      if (stored) setBrand(prev => ({ ...DEFAULT, ...prev, ...stored, socials: { ...DEFAULT.socials, ...(stored.socials || {}) } }));
-    }).catch(() => {});
+    supabase.from('brand_settings').select('*').eq('id', 1).single()
+      .then(({ data }) => {
+        if (data) setBrand({
+          logoUrl:   data.logo_url ?? '/Logo.png',
+          brandName: data.brand_name,
+          socials:   { facebook: data.facebook, instagram: data.instagram, youtube: data.youtube },
+        });
+      });
   }, []);
 
-  const save = useCallback((next) => {
-    setBrand(next);
-    set(BRAND_KEY, next).catch(err => console.error('Failed to save brand', err));
-  }, []);
-
-  const setLogo = useCallback((dataUrl) => {
-    setBrand(prev => { const next = { ...prev, logoUrl: dataUrl }; set(BRAND_KEY, next).catch(() => {}); return next; });
-  }, []);
-
-  const clearLogo = useCallback(() => {
-    setBrand(prev => { const next = { ...prev, logoUrl: null }; set(BRAND_KEY, next).catch(() => {}); return next; });
-  }, []);
-
-  const setBrandName = useCallback((name) => {
-    setBrand(prev => { const next = { ...prev, brandName: name || 'ShopNow' }; set(BRAND_KEY, next).catch(() => {}); return next; });
-  }, []);
-
-  const setSocials = useCallback((patch) => {
-    setBrand(prev => {
-      const next = { ...prev, socials: { ...prev.socials, ...patch } };
-      set(BRAND_KEY, next).catch(() => {});
-      return next;
+  const saveBrand = useCallback(async (updates) => {
+    await supabase.from('brand_settings').upsert({
+      id:         1,
+      logo_url:   updates.logoUrl,
+      brand_name: updates.brandName,
+      facebook:   updates.socials?.facebook  ?? '',
+      instagram:  updates.socials?.instagram ?? '',
+      youtube:    updates.socials?.youtube   ?? '',
+      updated_at: new Date().toISOString(),
     });
+    setBrand(updates);
+  }, []);
+
+  const uploadLogo = useCallback(async (file) => {
+    const path = `logo/${Date.now()}_${file.name}`;
+    const { error } = await supabase.storage.from('brand').upload(path, file, { upsert: true });
+    if (error) throw new Error(error.message);
+    const { data: { publicUrl } } = supabase.storage.from('brand').getPublicUrl(path);
+    return publicUrl;
   }, []);
 
   return (
-    <BrandContext.Provider value={{ ...brand, setLogo, clearLogo, setBrandName, setSocials }}>
+    <BrandContext.Provider value={{ brand, saveBrand, uploadLogo }}>
       {children}
     </BrandContext.Provider>
   );

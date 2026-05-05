@@ -1,6 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { uid } from '../utils/storage';
-import { get, set } from '../utils/idb';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
 import { addDays, orderId as makeOrderId } from '../utils/format';
 import { useAuth } from './AuthContext';
 
@@ -12,131 +11,126 @@ export function useOrders() {
 }
 
 export const ORDER_STAGES = [
-  { id: 'placed', label: 'Order Placed' },
-  { id: 'confirmed', label: 'Confirmed' },
-  { id: 'packed', label: 'Packed' },
-  { id: 'shipped', label: 'Shipped' },
+  { id: 'placed',           label: 'Order Placed' },
+  { id: 'confirmed',        label: 'Confirmed' },
+  { id: 'packed',           label: 'Packed' },
+  { id: 'shipped',          label: 'Shipped' },
   { id: 'out_for_delivery', label: 'Out for Delivery' },
-  { id: 'delivered', label: 'Delivered' },
+  { id: 'delivered',        label: 'Delivered' },
 ];
 
-export const ORDER_STATUS_OPTIONS = [...ORDER_STAGES.map((s) => s.id), 'cancelled'];
-
-// Persist helper — always saves immediately to IndexedDB
-function persist(orders) {
-  set('orders', orders).catch((err) => console.error('Failed to save orders', err));
-}
+const toApp = (row, items = []) => ({
+  id:                row.id,
+  number:            row.number,
+  userId:            row.user_id,
+  userEmail:         row.user_email,
+  status:            row.status,
+  totals: {
+    subtotal: Number(row.subtotal),
+    original: Number(row.original_total),
+    savings:  Number(row.savings),
+    shipping: Number(row.shipping),
+    tax:      Number(row.tax),
+    total:    Number(row.total),
+  },
+  address:           row.address,
+  payment:           row.payment,
+  timeline:          row.timeline ?? [],
+  estimatedDelivery: row.estimated_delivery,
+  createdAt:         row.created_at,
+  items:             items.map(i => ({
+    _key:          `${i.product_id}::${i.size ?? ''}::${i.color_index ?? 0}`,
+    productId:     i.product_id,
+    name:          i.name,
+    price:         Number(i.price),
+    originalPrice: Number(i.original_price),
+    image:         i.image,
+    size:          i.size,
+    color:         i.color_index,
+    colorHex:      i.color_hex,
+    qty:           i.qty,
+  })),
+});
 
 export function OrdersProvider({ children }) {
   const { user } = useAuth();
   const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  // Track whether the initial async load has completed so saves are guarded
-  const ready = useRef(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function init() {
-      try {
-        const stored = await get('orders');
-        if (!cancelled) {
-          if (stored && Array.isArray(stored) && stored.length > 0) {
-            setOrders(stored);
-          }
-          ready.current = true;
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error('Failed to load orders', err);
-        if (!cancelled) {
-          ready.current = true;
-          setLoading(false);
-        }
-      }
-    }
-    init();
-    // Cleanup: ignore stale async result on StrictMode remount
-    return () => { cancelled = true; };
-  }, []);
+  const load = useCallback(async () => {
+    if (!user) { setOrders([]); return; }
 
-  // Save whenever orders change, but only after initial load
-  useEffect(() => {
-    if (ready.current) {
-      persist(orders);
-    }
-  }, [orders]);
+    const query = user.role === 'admin'
+      ? supabase.from('orders').select('*, order_items(*)').order('created_at', { ascending: false })
+      : supabase.from('orders').select('*, order_items(*)').eq('user_id', user.id).order('created_at', { ascending: false });
 
-  const placeOrder = useCallback(({ items, totals, address, payment }) => {
-    const now = new Date();
-    const order = {
-      id: uid('ord'),
-      number: makeOrderId(),
-      userId: user?.id || null,
-      userEmail: user?.email || (address?.email ?? 'guest@shopnow.local'),
-      items,
-      totals,
-      address,
-      payment,
-      status: 'placed',
-      createdAt: now.toISOString(),
-      estimatedDelivery: addDays(now, 5).toISOString(),
-      timeline: [{ stage: 'placed', at: now.toISOString() }],
-    };
-    setOrders((arr) => {
-      const next = [order, ...arr];
-      // Save immediately regardless of ready flag — order must never be lost
-      persist(next);
-      return next;
-    });
-    return order;
+    const { data } = await query;
+    setOrders((data ?? []).map(o => toApp(o, o.order_items)));
   }, [user]);
 
-  const updateStatus = useCallback((orderId, status) => {
-    setOrders((arr) => {
-      const next = arr.map((o) => {
-        if (o.id !== orderId) return o;
-        const timeline = [...(o.timeline || []), { stage: status, at: new Date().toISOString() }];
-        return { ...o, status, timeline };
-      });
-      persist(next);
-      return next;
-    });
-  }, []);
+  useEffect(() => { load(); }, [load]);
 
-  const cancel = useCallback((orderId) => {
-    updateStatus(orderId, 'cancelled');
-  }, [updateStatus]);
+  const placeOrder = useCallback(async ({ items, totals, address, payment }) => {
+    if (!user) throw new Error('Must be logged in to place an order');
 
-  const removeOrder = useCallback((orderId) => {
-    setOrders((arr) => {
-      const next = arr.filter((o) => o.id !== orderId);
-      persist(next);
-      return next;
-    });
-  }, []);
+    const number = makeOrderId();
+    const now    = new Date().toISOString();
+    const timeline = [{ stage: 'placed', at: now }];
 
-  // Match by userId OR email so orders always appear even if session drifted
-  const myOrders = useMemo(() => {
-    if (!user) return [];
-    return orders.filter(
-      (o) => o.userId === user.id || (user.email && o.userEmail === user.email),
+    const { data: order, error } = await supabase.from('orders').insert({
+      number,
+      user_id:           user.id,
+      user_email:        user.email,
+      status:            'placed',
+      subtotal:          totals.subtotal,
+      original_total:    totals.original ?? totals.subtotal,
+      savings:           totals.savings ?? 0,
+      shipping:          totals.shipping,
+      tax:               totals.tax,
+      total:             totals.total,
+      address:           address,
+      payment:           payment,
+      timeline,
+      estimated_delivery: addDays(new Date(), 5).toISOString(),
+    }).select().single();
+
+    if (error) throw new Error(error.message);
+
+    await supabase.from('order_items').insert(
+      items.map(it => ({
+        order_id:       order.id,
+        product_id:     it.productId ?? null,
+        name:           it.name,
+        price:          it.price,
+        original_price: it.originalPrice,
+        image:          it.image,
+        size:           it.size,
+        color_index:    it.color,
+        color_hex:      it.colorHex,
+        qty:            it.qty,
+      }))
     );
-  }, [orders, user]);
 
-  const findById = useCallback(
-    (id) => orders.find((o) => o.id === id || o.number === id),
-    [orders],
+    const appOrder = toApp(order, items.map(it => ({
+      product_id: it.productId, name: it.name, price: it.price,
+      original_price: it.originalPrice, image: it.image,
+      size: it.size, color_index: it.color, color_hex: it.colorHex, qty: it.qty,
+    })));
+
+    setOrders(prev => [appOrder, ...prev]);
+    return appOrder;
+  }, [user]);
+
+  const updateStatus = useCallback(async (orderId, status) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+    const timeline = [...(order.timeline ?? []), { stage: status, at: new Date().toISOString() }];
+    await supabase.from('orders').update({ status, timeline }).eq('id', orderId);
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status, timeline } : o));
+  }, [orders]);
+
+  return (
+    <OrdersContext.Provider value={{ orders, placeOrder, updateStatus, reload: load }}>
+      {children}
+    </OrdersContext.Provider>
   );
-
-  const value = {
-    orders,
-    myOrders,
-    loading,
-    placeOrder,
-    updateStatus,
-    cancel,
-    removeOrder,
-    findById,
-  };
-  return <OrdersContext.Provider value={value}>{children}</OrdersContext.Provider>;
 }

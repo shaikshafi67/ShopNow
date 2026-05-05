@@ -1,140 +1,109 @@
-import { createContext, useContext, useState, useCallback } from 'react';
-
-const STORAGE_KEY = 'shopnow:discounts';
-
-const SEED = [
-  {
-    id: 'disc_first100',
-    title: 'FIRST100',
-    code: 'FIRST100',
-    type: 'amount_off_order',
-    method: 'code',
-    value: 100,
-    status: 'active',
-    minOrderValue: 500,
-    usageLimit: null,
-    usedCount: 1,
-    startsAt: null,
-    endsAt: null,
-    combinations: { products: false, orders: false, shipping: true },
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 'disc_save10',
-    title: 'SAVE10',
-    code: 'SAVE10',
-    type: 'percentage_off_order',
-    method: 'code',
-    value: 10,
-    status: 'active',
-    minOrderValue: 0,
-    usageLimit: null,
-    usedCount: 0,
-    startsAt: null,
-    endsAt: null,
-    combinations: { products: true, orders: true, shipping: true },
-    createdAt: new Date().toISOString(),
-  },
-];
-
-function load() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : SEED;
-  } catch {
-    return SEED;
-  }
-}
-
-function persist(data) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
 
 const DiscountsContext = createContext(null);
+export function useDiscounts() {
+  const ctx = useContext(DiscountsContext);
+  if (!ctx) throw new Error('useDiscounts must be used within DiscountsProvider');
+  return ctx;
+}
+
+const toApp = (d) => ({
+  id:             d.id,
+  title:          d.title,
+  code:           d.code,
+  type:           d.type,
+  value:          Number(d.value),
+  status:         d.status,
+  minOrderValue:  d.min_order_value ? Number(d.min_order_value) : null,
+  usageLimit:     d.usage_limit,
+  usedCount:      d.used_count,
+  startsAt:       d.starts_at,
+  endsAt:         d.ends_at,
+  combinations: {
+    products: d.combine_products,
+    orders:   d.combine_orders,
+    shipping: d.combine_shipping,
+  },
+  createdAt: d.created_at,
+});
 
 export function DiscountsProvider({ children }) {
-  const [discounts, setDiscounts] = useState(load);
+  const [discounts, setDiscounts] = useState([]);
 
-  const save = useCallback((next) => {
-    const updated = typeof next === 'function' ? next(discounts) : next;
-    setDiscounts(updated);
-    persist(updated);
-  }, [discounts]);
-
-  const addDiscount = useCallback((data) => {
-    const disc = {
-      ...data,
-      id: 'disc_' + Date.now(),
-      usedCount: 0,
-      createdAt: new Date().toISOString(),
-    };
-    setDiscounts((prev) => {
-      const next = [disc, ...prev];
-      persist(next);
-      return next;
-    });
-    return disc;
+  useEffect(() => {
+    supabase.from('discounts').select('*').order('created_at', { ascending: false })
+      .then(({ data }) => setDiscounts((data ?? []).map(toApp)));
   }, []);
 
-  const updateDiscount = useCallback((id, data) => {
-    setDiscounts((prev) => {
-      const next = prev.map((d) => (d.id === id ? { ...d, ...data } : d));
-      persist(next);
-      return next;
-    });
-  }, []);
-
-  const removeDiscount = useCallback((id) => {
-    setDiscounts((prev) => {
-      const next = prev.filter((d) => d.id !== id);
-      persist(next);
-      return next;
-    });
-  }, []);
-
-  const applyCode = useCallback((code, cartTotal) => {
-    const disc = discounts.find(
-      (d) => d.code.toUpperCase() === code.toUpperCase() && d.method === 'code',
+  const applyCode = useCallback((code, subtotal) => {
+    const disc = discounts.find(d =>
+      d.code.toLowerCase() === code.toLowerCase() &&
+      d.status === 'active' &&
+      (!d.usageLimit || d.usedCount < d.usageLimit) &&
+      (!d.startsAt || new Date(d.startsAt) <= new Date()) &&
+      (!d.endsAt   || new Date(d.endsAt)   >= new Date())
     );
-    if (!disc) return { valid: false, error: 'Invalid discount code.' };
-    if (disc.status !== 'active') return { valid: false, error: 'This discount is no longer active.' };
-    if (disc.usageLimit !== null && disc.usedCount >= disc.usageLimit)
-      return { valid: false, error: 'This discount has reached its usage limit.' };
-    if (disc.minOrderValue && cartTotal < disc.minOrderValue)
-      return { valid: false, error: `Minimum order of ₹${disc.minOrderValue} required.` };
-    if (disc.endsAt && new Date(disc.endsAt) < new Date())
-      return { valid: false, error: 'This discount has expired.' };
-    if (disc.startsAt && new Date(disc.startsAt) > new Date())
-      return { valid: false, error: 'This discount is not active yet.' };
+    if (!disc) return { valid: false, error: 'Invalid or expired coupon code' };
+    if (disc.minOrderValue && subtotal < disc.minOrderValue)
+      return { valid: false, error: `Minimum order value ₹${disc.minOrderValue} required` };
 
     let amount = 0;
-    if (disc.type === 'free_shipping') {
-      return { valid: true, discount: disc, amount: 0, freeShipping: true };
-    }
-    if (disc.valueType === 'fixed' || disc.type === 'amount_off_order' || disc.type === 'amount_off_product') {
-      amount = Math.min(disc.value, cartTotal);
-    } else if (disc.valueType === 'percentage' || disc.type === 'percentage_off_order' || disc.type === 'amount_off_products') {
-      amount = Math.round((cartTotal * disc.value) / 100);
-    }
+    let freeShipping = false;
+    if (disc.type === 'amount_off_order')      amount = Math.min(disc.value, subtotal);
+    else if (disc.type === 'percentage_off_order') amount = Math.round(subtotal * disc.value / 100);
+    else if (disc.type === 'free_shipping')    freeShipping = true;
 
-    return { valid: true, discount: disc, amount };
+    return { valid: true, discount: disc, amount, freeShipping };
   }, [discounts]);
 
-  const incrementUsed = useCallback((id) => {
-    setDiscounts((prev) => {
-      const next = prev.map((d) => (d.id === id ? { ...d, usedCount: d.usedCount + 1 } : d));
-      persist(next);
-      return next;
-    });
+  const incrementUsed = useCallback(async (discountId) => {
+    const disc = discounts.find(d => d.id === discountId);
+    if (!disc) return;
+    const newCount = disc.usedCount + 1;
+    await supabase.from('discounts').update({ used_count: newCount }).eq('id', discountId);
+    setDiscounts(prev => prev.map(d => d.id === discountId ? { ...d, usedCount: newCount } : d));
+  }, [discounts]);
+
+  const addDiscount = useCallback(async (disc) => {
+    const { data, error } = await supabase.from('discounts').insert({
+      title: disc.title, code: disc.code.toUpperCase(), type: disc.type,
+      value: disc.value, status: disc.status ?? 'active',
+      min_order_value: disc.minOrderValue ?? null,
+      usage_limit: disc.usageLimit ?? null, used_count: 0,
+      starts_at: disc.startsAt ?? null, ends_at: disc.endsAt ?? null,
+      combine_products: disc.combinations?.products ?? false,
+      combine_orders:   disc.combinations?.orders   ?? false,
+      combine_shipping: disc.combinations?.shipping  ?? false,
+    }).select().single();
+    if (error) throw new Error(error.message);
+    setDiscounts(prev => [toApp(data), ...prev]);
+    return toApp(data);
+  }, []);
+
+  const updateDiscount = useCallback(async (id, updates) => {
+    const { data, error } = await supabase.from('discounts').update({
+      title: updates.title, code: updates.code?.toUpperCase(), type: updates.type,
+      value: updates.value, status: updates.status,
+      min_order_value: updates.minOrderValue ?? null,
+      usage_limit: updates.usageLimit ?? null,
+      starts_at: updates.startsAt ?? null, ends_at: updates.endsAt ?? null,
+      combine_products: updates.combinations?.products ?? false,
+      combine_orders:   updates.combinations?.orders   ?? false,
+      combine_shipping: updates.combinations?.shipping  ?? false,
+    }).eq('id', id).select().single();
+    if (error) throw new Error(error.message);
+    setDiscounts(prev => prev.map(d => d.id === id ? toApp(data) : d));
+  }, []);
+
+  const deleteDiscount = useCallback(async (id) => {
+    await supabase.from('discounts').delete().eq('id', id);
+    setDiscounts(prev => prev.filter(d => d.id !== id));
   }, []);
 
   return (
-    <DiscountsContext.Provider value={{ discounts, addDiscount, updateDiscount, removeDiscount, applyCode, incrementUsed }}>
+    <DiscountsContext.Provider value={{ discounts, applyCode, incrementUsed, addDiscount, updateDiscount, deleteDiscount }}>
       {children}
     </DiscountsContext.Provider>
   );
-}
-
-export function useDiscounts() {
-  return useContext(DiscountsContext);
 }
