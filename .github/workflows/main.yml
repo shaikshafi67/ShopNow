@@ -19,5 +19,7 @@ jobs:
         run: |
           git config user.email "ci@shopnow"
           git config user.name "ShopNow CI"
-          git remote add hf https://shafi16:$HF_TOKEN@huggingface.co/spaces/shafi16/ShopNow
+          git config credential.helper store
+          echo "https://shafi16:${HF_TOKEN}@huggingface.co" > ~/.git-credentials
+          git remote add hf https://huggingface.co/spaces/shafi16/ShopNow
           git push hf main --force
