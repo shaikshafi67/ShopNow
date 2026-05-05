@@ -1,22 +1,41 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Search, X, Shield, ShieldCheck, UserCog, Mail, Calendar, Package } from 'lucide-react';
+import { Search, X, Shield, ShieldCheck, UserCog, Mail, Calendar, Package, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useOrders } from '../../context/OrdersContext';
 import { useToast } from '../../context/ToastContext';
 import { shortDate, inr } from '../../utils/format';
+import { read } from '../../utils/storage';
 
 export default function AdminUsers() {
   const { allUsers, user: currentUser } = useAuth();
   const { orders } = useOrders();
   const toast = useToast();
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // Force re-read from localStorage on mount and on manual refresh
+  const [liveUsers, setLiveUsers] = useState(() => {
+    const stored = read('users', null);
+    return stored && Array.isArray(stored) ? stored : allUsers;
+  });
+
+  useEffect(() => {
+    const stored = read('users', null);
+    if (stored && Array.isArray(stored)) setLiveUsers(stored);
+  }, [refreshKey, allUsers]);
+
+  const handleRefresh = () => {
+    const stored = read('users', null);
+    if (stored && Array.isArray(stored)) { setLiveUsers(stored); setRefreshKey(k => k + 1); }
+    toast.success(`Refreshed — ${stored?.length || 0} users loaded`);
+  };
 
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [expandedId, setExpandedId] = useState(null);
 
   const filtered = useMemo(() => {
-    let list = allUsers;
+    let list = liveUsers;
     if (roleFilter !== 'all') list = list.filter((u) => u.role === roleFilter);
     if (search) {
       const q = search.toLowerCase();
@@ -26,7 +45,7 @@ export default function AdminUsers() {
       );
     }
     return list;
-  }, [allUsers, search, roleFilter]);
+  }, [liveUsers, search, roleFilter]);
 
   const userOrders = useMemo(() => {
     const map = {};
@@ -40,20 +59,26 @@ export default function AdminUsers() {
 
   return (
     <div>
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 800, marginBottom: 4 }}>Users</h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
-          {allUsers.length} registered user{allUsers.length !== 1 ? 's' : ''} ·{' '}
-          {allUsers.filter((u) => u.role === 'admin').length} admin{allUsers.filter((u) => u.role === 'admin').length !== 1 ? 's' : ''}
-        </p>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, gap: 12 }}>
+        <div>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 800, marginBottom: 4 }}>Users</h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
+            {liveUsers.length} registered user{liveUsers.length !== 1 ? 's' : ''} ·{' '}
+            {liveUsers.filter((u) => u.role === 'admin').length} admin{liveUsers.filter((u) => u.role === 'admin').length !== 1 ? 's' : ''}
+          </p>
+        </div>
+        <button onClick={handleRefresh}
+          style={{ display:'flex', alignItems:'center', gap:7, padding:'9px 16px', borderRadius:8, border:'1px solid var(--border-glass)', background:'var(--bg-glass)', color:'var(--text-secondary)', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'var(--font-body)', flexShrink:0 }}>
+          <RefreshCw size={14} /> Refresh Users
+        </button>
       </div>
 
       {/* Quick stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 20 }}>
         {[
-          { label: 'Total Users', value: allUsers.length, icon: UserCog, color: '#7c6aff' },
-          { label: 'Admins', value: allUsers.filter((u) => u.role === 'admin').length, icon: ShieldCheck, color: '#f59e0b' },
-          { label: 'Customers', value: allUsers.filter((u) => u.role === 'user').length, icon: Shield, color: '#3b82f6' },
+          { label: 'Total Users', value: liveUsers.length, icon: UserCog, color: '#7c6aff' },
+          { label: 'Admins', value: liveUsers.filter((u) => u.role === 'admin').length, icon: ShieldCheck, color: '#f59e0b' },
+          { label: 'Customers', value: liveUsers.filter((u) => u.role === 'user').length, icon: Shield, color: '#3b82f6' },
         ].map((s, i) => (
           <motion.div
             key={s.label}

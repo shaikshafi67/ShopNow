@@ -5,10 +5,10 @@ import TryOn3DViewer from '../components/TryOn3DViewer';
 import {
   Camera, RotateCcw, CheckCircle, Sparkles as SparklesIcon,
   ChevronLeft, ChevronRight, X,
-  AlertCircle, ShoppingBag,
+  AlertCircle, ShoppingBag, Upload, ImagePlus,
 } from 'lucide-react';
 import useCamera from '../hooks/useCamera';
-import { menProducts, womenProducts } from '../data/products';
+import { allProducts } from '../data/products';
 import { submitTryOn, checkHealth } from '../utils/tryon_client';
 
 // ─── Pose definitions ──────────────────────────────────────────────────────────
@@ -17,40 +17,154 @@ const POSES = [
     id: 'front',
     label: 'Front View',
     instruction: 'Face the camera directly',
-    icon: '1',
-    arrow: 'up',
+    icon: '👤',
+    arrow: '↑',
   },
   {
     id: 'right',
     label: 'Right Side',
     instruction: 'Turn to show your right side',
-    icon: '2',
-    arrow: 'right',
+    icon: '👉',
+    arrow: '→',
   },
   {
     id: 'back',
     label: 'Back View',
     instruction: 'Turn your back to the camera',
-    icon: '3',
-    arrow: 'down',
+    icon: '🔄',
+    arrow: '↓',
   },
   {
     id: 'left',
     label: 'Left Side',
     instruction: 'Turn to show your left side',
-    icon: '4',
-    arrow: 'left',
+    icon: '👈',
+    arrow: '←',
   },
 ];
 
 const COUNTDOWN_SECONDS = 5;
 
-const CLOTHING_CAROUSEL = [
-  ...menProducts.tshirts.slice(0, 3),
-  ...menProducts.shirts.slice(0, 2),
-  ...womenProducts.tops.slice(0, 3),
-  ...womenProducts.dresses.slice(0, 2),
+const PICKER_CATEGORIES = [
+  { key: 'All',        label: 'All' },
+  { key: 'T-Shirts',   label: "Men's T-Shirts" },
+  { key: 'Shirts',     label: "Men's Shirts" },
+  { key: 'Jeans',      label: "Men's Jeans" },
+  { key: 'Tops',       label: "Women's Tops" },
+  { key: 'Dresses',    label: "Women's Dresses" },
+  { key: 'Kurtis',     label: 'Kurtis' },
+  { key: 'Co-ord Sets',label: 'Co-ords' },
+  { key: 'Sarees',     label: 'Sarees' },
 ];
+
+// ─── 3D Scene (reused from TryOnPage) ──────────────────────────────────────────
+
+function AvatarMesh({ hasResult }) {
+  const meshRef = useRef();
+  const [time, setTime] = useState(0);
+
+  useEffect(() => {
+    let raf;
+    const tick = () => {
+      setTime((t) => t + 0.016);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  return (
+    <group ref={meshRef} rotation={[0, Math.sin(time * 0.4) * 0.3, 0]}>
+      <mesh position={[0, 0, 0]}>
+        <capsuleGeometry args={[0.35, 1.4, 8, 16]} />
+        <meshStandardMaterial
+          color={hasResult ? '#7c6aff' : '#2a2a3e'}
+          roughness={0.3}
+          metalness={0.1}
+          emissive={hasResult ? '#2a1f66' : '#0a0a14'}
+        />
+      </mesh>
+      <mesh position={[0, 1.2, 0]}>
+        <sphereGeometry args={[0.28, 32, 32]} />
+        <meshStandardMaterial color={hasResult ? '#9d8fff' : '#2a2a3e'} roughness={0.4} />
+      </mesh>
+      {[-0.5, 0.5].map((x, i) => (
+        <mesh key={i} position={[x * 0.9, 0.1, 0]} rotation={[0, 0, x > 0 ? -0.3 : 0.3]}>
+          <capsuleGeometry args={[0.12, 0.8, 6, 12]} />
+          <meshStandardMaterial color={hasResult ? '#7c6aff' : '#252535'} roughness={0.3} />
+        </mesh>
+      ))}
+      {[-0.18, 0.18].map((x, i) => (
+        <mesh key={i} position={[x, -1.1, 0]}>
+          <capsuleGeometry args={[0.13, 0.8, 6, 12]} />
+          <meshStandardMaterial color={hasResult ? '#5a4fcc' : '#1e1e2e'} roughness={0.5} />
+        </mesh>
+      ))}
+      {hasResult && (
+        <mesh position={[0, -1.7, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <torusGeometry args={[0.5, 0.02, 8, 64]} />
+          <meshStandardMaterial color="#7c6aff" emissive="#7c6aff" emissiveIntensity={2} />
+        </mesh>
+      )}
+    </group>
+  );
+}
+
+function FloatingParticles() {
+  const count = 40;
+  const positions = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    positions[i * 3] = (Math.random() - 0.5) * 6;
+    positions[i * 3 + 1] = (Math.random() - 0.5) * 6;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 6;
+  }
+  const geo = useRef();
+
+  return (
+    <points ref={geo}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      </bufferGeometry>
+      <pointsMaterial size={0.025} color="#7c6aff" transparent opacity={0.6} />
+    </points>
+  );
+}
+
+function GridFloor() {
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]}>
+      <planeGeometry args={[10, 10, 20, 20]} />
+      <meshStandardMaterial color="#0a0a14" wireframe opacity={0.3} transparent />
+    </mesh>
+  );
+}
+
+function Scene3D({ hasResult }) {
+  return (
+    <>
+      <ambientLight intensity={0.4} />
+      <directionalLight position={[3, 5, 3]} intensity={1.2} color="#ffffff" castShadow />
+      <pointLight position={[-3, 3, -3]} intensity={0.8} color="#7c6aff" />
+      <pointLight position={[3, -1, 3]} intensity={0.5} color="#ff6a9a" />
+      <spotLight position={[0, 8, 0]} intensity={1} angle={0.4} penumbra={0.5} color="white" />
+      <FloatingParticles />
+      <GridFloor />
+      <Float speed={1.5} rotationIntensity={0.2} floatIntensity={0.3}>
+        <AvatarMesh hasResult={hasResult} />
+      </Float>
+      <OrbitControls
+        enablePan={false}
+        minDistance={2.5}
+        maxDistance={8}
+        minPolarAngle={Math.PI / 6}
+        maxPolarAngle={Math.PI / 1.5}
+        autoRotate={!hasResult}
+        autoRotateSpeed={0.8}
+      />
+      <Environment preset="night" />
+    </>
+  );
+}
 
 // ─── Countdown Ring SVG ────────────────────────────────────────────────────────
 
@@ -155,11 +269,9 @@ function PoseGuide({ pose }) {
           transform: 'translateX(-50%)',
           fontSize: 48,
           opacity: 0.8,
-          color: 'white',
-          fontWeight: 700,
         }}
       >
-        {pose.arrow === 'up' ? '↑' : pose.arrow === 'right' ? '→' : pose.arrow === 'down' ? '↓' : '←'}
+        {pose.arrow === '↑' ? '⬆️' : pose.arrow === '→' ? '➡️' : pose.arrow === '↓' ? '⬇️' : '⬅️'}
       </motion.div>
     </motion.div>
   );
@@ -674,6 +786,7 @@ function TryOnPreviewPanel({ phase, capturePreviewUrls, selectedClothing, progre
           display: 'flex', alignItems: 'center', gap: 10, fontSize: 13,
           color: 'var(--text-secondary)',
         }}>
+          <span style={{ fontSize: 16 }}>💡</span>
           <span>For best results: stand 1.5–2m away, full body visible, bright lighting. Tap to see outfit detail.</span>
         </div>
       )}
@@ -688,13 +801,14 @@ function TryOnPreviewPanel({ phase, capturePreviewUrls, selectedClothing, progre
 export default function LiveTryOnPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const product = location.state?.product || CLOTHING_CAROUSEL[0];
+  const product = location.state?.product || allProducts[0];
+  const startPhase = location.state?.startPhase || 'intro';
 
   // Camera hook
   const { videoRef, canvasRef, isStreaming, error: cameraError, startCamera, stopCamera, captureFrame } = useCamera();
 
   // Capture state
-  const [phase, setPhase] = useState('intro'); // intro | capturing | processing | result
+  const [phase, setPhase] = useState(startPhase); // intro | upload | capturing | processing | result
   const [cameraReady, setCameraReady] = useState(false); // false during warmup
   const [currentPoseIndex, setCurrentPoseIndex] = useState(0);
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
@@ -710,13 +824,18 @@ export default function LiveTryOnPage() {
 
   // Clothing selection
   const [selectedClothing, setSelectedClothing] = useState(product);
-  const [carouselOffset, setCarouselOffset] = useState(0);
   const [modalOpen, setModalOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState('');
+  const [pickerCategory, setPickerCategory] = useState('All');
 
   // 3D viewer state
   const [viewer3DImages, setViewer3DImages] = useState(null);   // { front, right, back, left }
   const [viewer3DLoading, setViewer3DLoading] = useState(false);
   const [viewer3DStatus, setViewer3DStatus] = useState('');
+
+  // Upload mode state
+  const [uploadedFiles, setUploadedFiles] = useState({ front: null, right: null, back: null, left: null });
 
   // Single ref that owns the entire capture flow — avoids stale closure bugs
   const flowRef = useRef({
@@ -853,6 +972,32 @@ export default function LiveTryOnPage() {
     }
   }, []);
 
+  // ── Upload mode — user picks 4 photos from disk ────────────────────────────
+  const handleStartUpload = useCallback(() => {
+    setUploadedFiles({ front: null, right: null, back: null, left: null });
+    setCapturePreviewUrls({});
+    setCaptures({});
+    setProgress(0);
+    setMeshUrl(null);
+    setApiError(null);
+    setPhase('upload');
+  }, []);
+
+  const handleCompleteUpload = useCallback((files) => {
+    const urls = {};
+    const fileMap = {};
+    for (const [key, file] of Object.entries(files)) {
+      if (file) {
+        urls[key] = URL.createObjectURL(file);
+        fileMap[key] = file;
+      }
+    }
+    setCapturePreviewUrls(urls);
+    setCaptures(fileMap);
+    flowRef.current = { active: true, captures: fileMap, captureUrls: urls, countdownTimer: null, skipCountdown: null };
+    if (triggerGenerateRef.current) triggerGenerateRef.current(fileMap);
+  }, []);
+
   // ── Generate try-on + 3D ──────────────────────────────────────────────────
   const triggerGenerate = useCallback(async (allCaptures) => {
     setPhase('processing');
@@ -863,53 +1008,73 @@ export default function LiveTryOnPage() {
     setViewer3DLoading(true);
     setViewer3DStatus('Starting AI try-on...');
 
+    // Build raw preview URLs for immediate display
+    const rawUrls = {};
+    for (const [k, v] of Object.entries(allCaptures)) {
+      if (v) rawUrls[k] = URL.createObjectURL(v);
+    }
+
     try {
-      // ── Step 1: IDM-VTON — put the clothing on the front photo ────────────
       const { runVirtualTryOn } = await import('../utils/tryon_hf.js');
 
-      const frontFile = allCaptures.front;
+      // Resolve garment URL — pass data:/blob:/http: URLs as-is, prefix relative paths only
+      const _src = selectedClothing.images[0];
+      const garmentUrl = (_src.startsWith('http') || _src.startsWith('data:') || _src.startsWith('blob:'))
+        ? _src
+        : `${window.location.origin}${_src}`;
+
+      console.log('[TryOn] garmentUrl:', garmentUrl);
+      console.log('[TryOn] personFile:', allCaptures.front?.name, allCaptures.front?.size);
+
+      // ── Step 1: Front view (required) ─────────────────────────────────────
+      setViewer3DStatus('Fitting outfit on Front view...');
       const frontTryOnUrl = await runVirtualTryOn({
-        personFile:  frontFile,
-        garmentUrl:  selectedClothing.images[0],
-        onStatus:    (msg) => { setViewer3DStatus(msg); setProgress(30); },
+        personFile: allCaptures.front,
+        garmentUrl,
+        onStatus:   (msg) => { console.log('[TryOn status]', msg); setViewer3DStatus(msg); },
       });
+      console.log('[TryOn] frontTryOnUrl:', frontTryOnUrl?.slice(0, 80));
+      setProgress(30);
 
-      setProgress(50);
-
-      // Show result immediately with front view while Gemini generates other angles
-      setViewer3DImages({ front: frontTryOnUrl, right: allCaptures.right, back: allCaptures.back, left: allCaptures.left });
+      // Show front result immediately so user sees something
+      setViewer3DImages({ front: frontTryOnUrl, ...rawUrls });
       setPhase('result');
-      setProgress(60);
 
-      // ── Step 2: Gemini — generate right, back, left AI views ─────────────
-      setViewer3DStatus('Generating 3D angles with Gemini AI...');
-      const { generateAllAngles } = await import('../utils/gemini3d.js');
+      // ── Step 2: Right / Back / Left — sequentially to avoid quota hits ────
+      const sideAngles = ['right', 'back', 'left'];
+      const results = { front: frontTryOnUrl };
+      let step = 0;
 
-      const allAngles = await generateAllAngles(
-        frontTryOnUrl,
-        (msg) => setViewer3DStatus(msg),
-        { right: allCaptures.right ? URL.createObjectURL(allCaptures.right) : null,
-          back:  allCaptures.back  ? URL.createObjectURL(allCaptures.back)  : null,
-          left:  allCaptures.left  ? URL.createObjectURL(allCaptures.left)  : null,
+      for (const angle of sideAngles) {
+        if (!allCaptures[angle]) {
+          results[angle] = rawUrls[angle] || null;
+          continue;
         }
-      );
+        step++;
+        setViewer3DStatus(`Fitting outfit on ${angle.charAt(0).toUpperCase() + angle.slice(1)} view (${step}/3)...`);
+        try {
+          const url = await runVirtualTryOn({
+            personFile: allCaptures[angle],
+            garmentUrl,
+            onStatus:   () => {},
+          });
+          results[angle] = url;
+        } catch {
+          results[angle] = rawUrls[angle] || null;
+        }
+        setViewer3DImages({ ...results });
+        setProgress(30 + step * 20);
+      }
 
-      setViewer3DImages(allAngles);
       setProgress(100);
       setViewer3DLoading(false);
       setViewer3DStatus('');
 
     } catch (err) {
-      console.warn('[LiveTryOn] pipeline error:', err.message);
-      setApiError(err.message);
+      console.error('[LiveTryOn] pipeline error:', err);
+      setApiError(err.message || String(err));
       setViewer3DLoading(false);
-
-      // Fallback — show raw captured photos in 3D viewer
-      const rawUrls = {};
-      for (const [k, v] of Object.entries(allCaptures)) {
-        if (v) rawUrls[k] = URL.createObjectURL(v);
-      }
-      setViewer3DImages(rawUrls);
+      setViewer3DImages(Object.keys(rawUrls).length > 0 ? rawUrls : null);
       setPhase('result');
       setProgress(100);
     }
@@ -967,6 +1132,7 @@ export default function LiveTryOnPage() {
               </div>
               <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
                 {phase === 'intro' && 'Open your camera • Auto-capture 4 angles • See your outfit in 3D'}
+                {phase === 'upload' && 'Upload 4 photos of yourself — AI try-on runs on every angle'}
                 {phase === 'capturing' && `Capturing ${currentPose?.label} — ${capturedCount}/${POSES.length} done`}
                 {phase === 'processing' && 'Building your 3D avatar...'}
                 {phase === 'result' && 'Your 3D avatar is ready! Rotate to explore.'}
@@ -975,13 +1141,13 @@ export default function LiveTryOnPage() {
 
             {/* Step indicators */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              {['Camera Setup', 'Auto Capture', 'View in 3D'].map((step, i) => {
+              {['Setup', 'Photos', 'View in 3D'].map((step, i) => {
                 const isActive =
                   (phase === 'intro' && i === 0) ||
-                  (phase === 'capturing' && i === 1) ||
+                  ((phase === 'capturing' || phase === 'upload') && i === 1) ||
                   ((phase === 'processing' || phase === 'result') && i === 2);
                 const isDone =
-                  (phase === 'capturing' && i === 0) ||
+                  ((phase === 'capturing' || phase === 'upload') && i === 0) ||
                   ((phase === 'processing' || phase === 'result') && i <= 1);
 
                 return (
@@ -1058,6 +1224,21 @@ export default function LiveTryOnPage() {
                     </div>
                   </div>
 
+                  {/* Change outfit button (browse all products before capture) */}
+                  <motion.button
+                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                    onClick={() => { setPickerOpen(true); setPickerSearch(''); setPickerCategory('All'); }}
+                    style={{
+                      width: '100%', padding: '12px 16px', marginBottom: 24,
+                      background: 'rgba(124,106,255,0.1)', border: '1px solid var(--accent)',
+                      borderRadius: 12, color: 'var(--accent)', fontWeight: 700, fontSize: 14,
+                      cursor: 'pointer', fontFamily: 'var(--font-body)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    }}
+                  >
+                    <ShoppingBag size={16} /> Change Outfit · Browse All Products
+                  </motion.button>
+
                   {/* How it works */}
                   <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, marginBottom: 20 }}>
                     How It Works
@@ -1103,10 +1284,10 @@ export default function LiveTryOnPage() {
                     borderRadius: 16, padding: '16px 20px', marginBottom: 28,
                   }}>
                     <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 10 }}>
-                      Tips for Best Results
+                      📸 Tips for Best Results
                     </p>
                     {[
-                      'Full body visible — head to toe in frame for best AI results',
+                      '🔑 Full body visible — head to toe in frame for best AI results',
                       'Stand 1.5–2m from camera so your whole body fits',
                       'Plain background (white wall) gives cleanest output',
                       'Good lighting — face a window or bright light source',
@@ -1152,13 +1333,29 @@ export default function LiveTryOnPage() {
                     <Camera size={20} /> Open Camera & Start
                   </motion.button>
 
-                  <button
-                    onClick={() => navigate('/tryon', { state: { product: selectedClothing } })}
-                    className="btn btn-ghost"
-                    style={{ width: '100%', justifyContent: 'center', marginTop: 12 }}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '14px 0' }}>
+                    <div style={{ flex: 1, height: 1, background: 'var(--border-glass)' }} />
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>OR</span>
+                    <div style={{ flex: 1, height: 1, background: 'var(--border-glass)' }} />
+                  </div>
+
+                  <motion.button
+                    whileHover={{ scale: 1.02, y: -2 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={handleStartUpload}
+                    style={{
+                      width: '100%', padding: '16px',
+                      background: 'var(--bg-glass)',
+                      border: '2px solid var(--border-glass-hover)', borderRadius: 14, fontSize: 16, fontWeight: 700,
+                      color: 'var(--text-primary)', cursor: 'pointer', fontFamily: 'var(--font-body)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                    }}
                   >
-                    Or upload photos manually instead
-                  </button>
+                    <Upload size={20} /> Upload 4 Photos Instead
+                  </motion.button>
+                  <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
+                    Upload front, right, back & left photos — try-on runs on all 4 angles
+                  </p>
                 </motion.div>
               )}
 
@@ -1378,6 +1575,147 @@ export default function LiveTryOnPage() {
                 </motion.div>
               )}
 
+              {/* ── UPLOAD PHASE ─── */}
+              {phase === 'upload' && (
+                <motion.div
+                  key="upload"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                >
+                  <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, marginBottom: 6 }}>
+                    Upload Your 4 Photos
+                  </h2>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 20 }}>
+                    AI try-on will run on each angle separately — you'll see yourself in the outfit from all sides.
+                  </p>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }}>
+                    {POSES.map((pose) => {
+                      const file = uploadedFiles[pose.id];
+                      const previewUrl = file ? URL.createObjectURL(file) : null;
+                      return (
+                        <label key={pose.id} style={{ cursor: 'pointer' }}>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            style={{ display: 'none' }}
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) setUploadedFiles(prev => ({ ...prev, [pose.id]: f }));
+                            }}
+                          />
+                          <motion.div
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.97 }}
+                            style={{
+                              borderRadius: 16, overflow: 'hidden',
+                              border: `2px solid ${file ? 'var(--accent)' : 'rgba(255,255,255,0.1)'}`,
+                              aspectRatio: '3/4', position: 'relative',
+                              background: 'var(--bg-glass)',
+                              boxShadow: file ? '0 0 16px var(--accent-glow)' : 'none',
+                              transition: 'all 0.2s',
+                            }}
+                          >
+                            {previewUrl ? (
+                              <>
+                                <img src={previewUrl} alt={pose.label} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                <div style={{
+                                  position: 'absolute', inset: 0,
+                                  background: 'linear-gradient(to top, rgba(5,5,8,0.85) 0%, transparent 50%)',
+                                }} />
+                                <div style={{
+                                  position: 'absolute', top: 8, right: 8,
+                                  width: 22, height: 22, borderRadius: '50%',
+                                  background: '#00c864', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                }}>
+                                  <CheckCircle size={14} color="white" />
+                                </div>
+                                <div style={{ position: 'absolute', bottom: 10, left: 0, right: 0, textAlign: 'center' }}>
+                                  <p style={{ fontSize: 12, fontWeight: 800, color: 'white' }}>{pose.label}</p>
+                                  <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>Tap to change</p>
+                                </div>
+                              </>
+                            ) : (
+                              <div style={{
+                                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                                justifyContent: 'center', height: '100%', gap: 10, padding: 16,
+                              }}>
+                                <div style={{
+                                  width: 48, height: 48, borderRadius: '50%',
+                                  background: 'rgba(124,106,255,0.1)', border: '1px solid rgba(124,106,255,0.25)',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  fontSize: 22,
+                                }}>
+                                  {pose.icon}
+                                </div>
+                                <div style={{ textAlign: 'center' }}>
+                                  <p style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)', marginBottom: 4 }}>
+                                    {pose.label}
+                                  </p>
+                                  <p style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                                    {pose.instruction}
+                                  </p>
+                                </div>
+                                <div style={{
+                                  display: 'flex', alignItems: 'center', gap: 5,
+                                  color: 'var(--accent)', fontSize: 12, fontWeight: 700,
+                                }}>
+                                  <ImagePlus size={14} /> Upload
+                                </div>
+                              </div>
+                            )}
+                          </motion.div>
+                        </label>
+                      );
+                    })}
+                  </div>
+
+                  {/* Progress indicator */}
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
+                    {POSES.map(pose => (
+                      <div key={pose.id} style={{
+                        flex: 1, height: 4, borderRadius: 2,
+                        background: uploadedFiles[pose.id] ? 'var(--accent)' : 'var(--border-glass)',
+                        transition: 'background 0.3s',
+                      }} />
+                    ))}
+                  </div>
+
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16, textAlign: 'center' }}>
+                    {Object.values(uploadedFiles).filter(Boolean).length} / 4 photos uploaded
+                    {Object.values(uploadedFiles).filter(Boolean).length === 4 && ' — Ready!'}
+                  </p>
+
+                  <motion.button
+                    whileHover={uploadedFiles.front ? { scale: 1.02, y: -2 } : {}}
+                    onClick={() => uploadedFiles.front && handleCompleteUpload(uploadedFiles)}
+                    style={{
+                      width: '100%', padding: '16px',
+                      background: uploadedFiles.front ? 'var(--gradient-1)' : 'var(--bg-glass)',
+                      border: 'none', borderRadius: 14, fontSize: 16, fontWeight: 700,
+                      color: uploadedFiles.front ? 'white' : 'var(--text-muted)',
+                      cursor: uploadedFiles.front ? 'pointer' : 'not-allowed',
+                      fontFamily: 'var(--font-body)',
+                      boxShadow: uploadedFiles.front ? '0 6px 24px var(--accent-glow)' : 'none',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                      transition: 'all 0.3s',
+                    }}
+                  >
+                    <SparklesIcon size={18} />
+                    {uploadedFiles.front ? 'Generate Try-On on All Angles' : 'Upload at least Front photo'}
+                  </motion.button>
+
+                  <button
+                    onClick={() => setPhase('intro')}
+                    className="btn btn-ghost"
+                    style={{ width: '100%', justifyContent: 'center', marginTop: 12 }}
+                  >
+                    <X size={15} /> Back
+                  </button>
+                </motion.div>
+              )}
+
               {/* ── PROCESSING PHASE ─── */}
               {phase === 'processing' && (
                 <motion.div
@@ -1456,92 +1794,77 @@ export default function LiveTryOnPage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                 >
-                  {/* Success banner */}
-                  <div style={{
-                    background: 'rgba(0,200,100,0.08)', border: '1px solid rgba(0,200,100,0.2)',
-                    borderRadius: 16, padding: '16px 20px',
-                    display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24,
-                  }}>
-                    <CheckCircle size={22} color="#00c864" />
-                    <div>
-                      <p style={{ fontSize: 15, fontWeight: 700, color: '#00c864', marginBottom: 2 }}>3D Avatar Generated!</p>
-                      <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Rotate and zoom the 3D stage to explore your look.</p>
+                  {/* Success / error banner */}
+                  {apiError ? (
+                    <div style={{
+                      background: 'rgba(255,70,70,0.08)', border: '1px solid rgba(255,70,70,0.25)',
+                      borderRadius: 16, padding: '14px 18px',
+                      display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 20,
+                    }}>
+                      <AlertCircle size={20} color="#ff4646" style={{ flexShrink: 0, marginTop: 2 }} />
+                      <div>
+                        <p style={{ fontSize: 14, fontWeight: 700, color: '#ff4646', marginBottom: 4 }}>
+                          Try-On Failed — showing your photos instead
+                        </p>
+                        <p style={{ fontSize: 12, color: 'rgba(255,100,100,0.8)', lineHeight: 1.5 }}>
+                          {apiError}
+                        </p>
+                        <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
+                          Check browser console (F12) for full error details.
+                        </p>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div style={{
+                      background: 'rgba(0,200,100,0.08)', border: '1px solid rgba(0,200,100,0.2)',
+                      borderRadius: 16, padding: '16px 20px',
+                      display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24,
+                    }}>
+                      <CheckCircle size={22} color="#00c864" />
+                      <div>
+                        <p style={{ fontSize: 15, fontWeight: 700, color: '#00c864', marginBottom: 2 }}>3D Avatar Generated!</p>
+                        <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Rotate and zoom the 3D stage to explore your look.</p>
+                      </div>
+                    </div>
+                  )}
 
                   <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, marginBottom: 20 }}>
                     Change Outfit
                   </h2>
 
-                  {/* Clothing carousel */}
-                  <div style={{ position: 'relative', marginBottom: 24 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-                      {CLOTHING_CAROUSEL.slice(carouselOffset, carouselOffset + 4).map((item) => (
-                        <motion.div
-                          key={item.id}
-                          whileHover={{ scale: 1.04 }}
-                          whileTap={{ scale: 0.97 }}
-                          onClick={() => setSelectedClothing(item)}
-                          style={{
-                            borderRadius: 14, overflow: 'hidden',
-                            border: '2px solid',
-                            borderColor: selectedClothing?.id === item.id ? 'var(--accent)' : 'var(--border-glass)',
-                            cursor: 'pointer',
-                            aspectRatio: '2/3',
-                            background: 'var(--bg-card)',
-                            position: 'relative',
-                            boxShadow: selectedClothing?.id === item.id ? '0 0 20px var(--accent-glow)' : 'none',
-                            transition: 'all var(--transition)',
-                          }}
-                        >
-                          <img src={item.images[0]} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => e.target.style.display = 'none'} />
-                          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(5,5,8,0.9) 0%, transparent 60%)' }} />
-                          <div style={{ position: 'absolute', bottom: 6, left: 6, right: 6 }}>
-                            <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)', fontWeight: 600, lineHeight: 1.3 }}>
-                              {item.name.split(' ').slice(0, 3).join(' ')}
-                            </p>
-                          </div>
-                          {selectedClothing?.id === item.id && (
-                            <div style={{
-                              position: 'absolute', top: 6, right: 6,
-                              width: 20, height: 20, borderRadius: '50%',
-                              background: 'var(--accent)',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              fontSize: 11, color: 'white', fontWeight: 700,
-                            }}>✓</div>
-                          )}
-                        </motion.div>
-                      ))}
+                  {/* Current clothing + browse button */}
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      background: 'var(--bg-glass)', border: '1px solid var(--border-glass)',
+                      borderRadius: 14, padding: '12px 14px', marginBottom: 12,
+                    }}>
+                      <img
+                        src={selectedClothing?.images[0]} alt=""
+                        style={{ width: 48, height: 60, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--accent)', flexShrink: 0 }}
+                        onError={(e) => e.target.style.display = 'none'}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Selected outfit</p>
+                        <p style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {selectedClothing?.name}
+                        </p>
+                        <p style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 13 }}>₹{selectedClothing?.price?.toLocaleString()}</p>
+                      </div>
                     </div>
-
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 12 }}>
-                      <button
-                        onClick={() => setCarouselOffset((o) => Math.max(0, o - 4))}
-                        disabled={carouselOffset === 0}
-                        style={{
-                          width: 32, height: 32, borderRadius: 8,
-                          background: 'var(--bg-glass)', border: '1px solid var(--border-glass)',
-                          color: carouselOffset === 0 ? 'var(--text-muted)' : 'var(--text-primary)',
-                          cursor: carouselOffset === 0 ? 'not-allowed' : 'pointer',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}
-                      >
-                        <ChevronLeft size={16} />
-                      </button>
-                      <button
-                        onClick={() => setCarouselOffset((o) => Math.min(CLOTHING_CAROUSEL.length - 4, o + 4))}
-                        disabled={carouselOffset + 4 >= CLOTHING_CAROUSEL.length}
-                        style={{
-                          width: 32, height: 32, borderRadius: 8,
-                          background: 'var(--bg-glass)', border: '1px solid var(--border-glass)',
-                          color: carouselOffset + 4 >= CLOTHING_CAROUSEL.length ? 'var(--text-muted)' : 'var(--text-primary)',
-                          cursor: carouselOffset + 4 >= CLOTHING_CAROUSEL.length ? 'not-allowed' : 'pointer',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}
-                      >
-                        <ChevronRight size={16} />
-                      </button>
-                    </div>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                      onClick={() => { setPickerOpen(true); setPickerSearch(''); setPickerCategory('All'); }}
+                      style={{
+                        width: '100%', padding: '12px 16px',
+                        background: 'rgba(124,106,255,0.1)', border: '1px solid var(--accent)',
+                        borderRadius: 12, color: 'var(--accent)', fontWeight: 700, fontSize: 14,
+                        cursor: 'pointer', fontFamily: 'var(--font-body)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      }}
+                    >
+                      <ShoppingBag size={16} /> Browse All Products
+                    </motion.button>
                   </div>
 
                   {/* Selected clothing info */}
@@ -1633,6 +1956,124 @@ export default function LiveTryOnPage() {
 
       {/* Hidden canvas for frame capture */}
       <canvas ref={canvasRef} style={{ display: 'none' }} />
+
+      {/* ── Product Picker Modal ───────────────────────────────────────────── */}
+      <AnimatePresence>
+        {pickerOpen && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={() => setPickerOpen(false)}
+            style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)',
+              backdropFilter: 'blur(12px)', zIndex: 4000,
+              display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+            }}
+          >
+            <motion.div
+              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+              transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '100%', maxWidth: 760, maxHeight: '88vh',
+                background: 'var(--bg-card)', borderRadius: '24px 24px 0 0',
+                border: '1px solid var(--border-glass)', borderBottom: 'none',
+                display: 'flex', flexDirection: 'column', overflow: 'hidden',
+              }}
+            >
+              {/* Header */}
+              <div style={{ padding: '20px 20px 12px', borderBottom: '1px solid var(--border-glass)', flexShrink: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                  <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700 }}>Choose Outfit to Try On</h3>
+                  <button onClick={() => setPickerOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}>
+                    <X size={22} />
+                  </button>
+                </div>
+                {/* Search */}
+                <div style={{ position: 'relative', marginBottom: 12 }}>
+                  <input
+                    value={pickerSearch}
+                    onChange={(e) => setPickerSearch(e.target.value)}
+                    placeholder="Search products..."
+                    style={{
+                      width: '100%', padding: '10px 14px 10px 38px',
+                      background: 'var(--bg-glass)', border: '1px solid var(--border-glass)',
+                      borderRadius: 10, color: 'var(--text-primary)', fontSize: 14,
+                      fontFamily: 'var(--font-body)', outline: 'none', boxSizing: 'border-box',
+                    }}
+                  />
+                  <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: 14 }}>🔍</span>
+                </div>
+                {/* Category tabs */}
+                <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+                  {PICKER_CATEGORIES.map((cat) => (
+                    <button
+                      key={cat.key}
+                      onClick={() => setPickerCategory(cat.key)}
+                      style={{
+                        flexShrink: 0, padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+                        cursor: 'pointer', fontFamily: 'var(--font-body)',
+                        background: pickerCategory === cat.key ? 'var(--accent)' : 'var(--bg-glass)',
+                        border: `1px solid ${pickerCategory === cat.key ? 'var(--accent)' : 'var(--border-glass)'}`,
+                        color: pickerCategory === cat.key ? 'white' : 'var(--text-secondary)',
+                        transition: 'all var(--transition)',
+                      }}
+                    >{cat.label}</button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Product grid */}
+              <div style={{ overflowY: 'auto', padding: 16, flex: 1 }}>
+                {(() => {
+                  const filtered = allProducts.filter((p) => {
+                    const matchCat = pickerCategory === 'All' || p.category === pickerCategory;
+                    const matchSearch = !pickerSearch || p.name.toLowerCase().includes(pickerSearch.toLowerCase());
+                    return matchCat && matchSearch;
+                  });
+                  if (!filtered.length) return (
+                    <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0' }}>No products found</p>
+                  );
+                  return (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 12 }}>
+                      {filtered.map((item) => (
+                        <motion.div
+                          key={item.id}
+                          whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
+                          onClick={() => { setSelectedClothing(item); setPickerOpen(false); }}
+                          style={{
+                            borderRadius: 12, overflow: 'hidden', cursor: 'pointer',
+                            border: '2px solid',
+                            borderColor: selectedClothing?.id === item.id ? 'var(--accent)' : 'var(--border-glass)',
+                            aspectRatio: '2/3', background: 'var(--bg-secondary)', position: 'relative',
+                            boxShadow: selectedClothing?.id === item.id ? '0 0 16px var(--accent-glow)' : 'none',
+                          }}
+                        >
+                          <img src={item.images[0]} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => e.target.style.display = 'none'} />
+                          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(5,5,8,0.92) 0%, transparent 55%)' }} />
+                          <div style={{ position: 'absolute', bottom: 6, left: 6, right: 6 }}>
+                            <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.75)', fontWeight: 600, lineHeight: 1.3, marginBottom: 1 }}>
+                              {item.name.split(' ').slice(0, 3).join(' ')}
+                            </p>
+                            <p style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700 }}>₹{item.price.toLocaleString()}</p>
+                          </div>
+                          {selectedClothing?.id === item.id && (
+                            <div style={{
+                              position: 'absolute', top: 6, right: 6,
+                              width: 20, height: 20, borderRadius: '50%',
+                              background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: 11, color: 'white', fontWeight: 700,
+                            }}>✓</div>
+                          )}
+                        </motion.div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Buy Modal ──────────────────────────────────────────────────────── */}
       <AnimatePresence>

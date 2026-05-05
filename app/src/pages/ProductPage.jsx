@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, ShoppingBag, Sparkles, Star, ChevronLeft, ChevronRight, RotateCcw, Shield, Truck, Share2, Minus, Plus, CheckCircle } from 'lucide-react';
+import { Heart, ShoppingBag, Sparkles, Star, ChevronLeft, ChevronRight, RotateCcw, Shield, Truck, Share2, Minus, Plus, CheckCircle, Bell, BellRing, Camera, Upload, X } from 'lucide-react';
 import { useCatalog } from '../context/CatalogContext';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -9,6 +9,8 @@ import { useWishlist } from '../context/WishlistContext';
 import { useToast } from '../context/ToastContext';
 import ProductCard from '../components/ProductCard';
 import ReviewsSection from '../components/ReviewsSection';
+import SizeChartModal from '../components/SizeChartModal';
+import { useReviews } from '../context/ReviewsContext';
 import { inr } from '../utils/format';
 
 export default function ProductPage() {
@@ -18,6 +20,7 @@ export default function ProductPage() {
   const { byId, products } = useCatalog();
   const { add: addToCart } = useCart();
   const { user } = useAuth();
+  const { summary: reviewSummary } = useReviews();
   const { has, toggle: toggleWishlist } = useWishlist();
   const toast = useToast();
 
@@ -27,6 +30,14 @@ export default function ProductPage() {
   const [selectedColor, setSelectedColor] = useState(0);
   const [qty, setQty] = useState(1);
   const [addedToCart, setAddedToCart] = useState(false);
+  const [showSizeChart, setShowSizeChart] = useState(false);
+  const [tryOnModalOpen, setTryOnModalOpen] = useState(false);
+  const [notified, setNotified] = useState(() => {
+    try {
+      const list = JSON.parse(localStorage.getItem('shopnow:notifications') || '[]');
+      return list.some(n => n.productId === id);
+    } catch { return false; }
+  });
 
   if (!product) {
     return (
@@ -39,7 +50,48 @@ export default function ProductPage() {
 
   const wished = has(product.id);
   const similar = products.filter((p) => p.id !== id && p.category === product.category).slice(0, 4);
-  const outOfStock = product.stock === 0;
+  // Per-color per-size data from selected color's sizeVariants
+  const colorSizeData = useMemo(() => {
+    const cv = product.colorVariants?.[selectedColor];
+    if (!cv?.sizeVariants?.length) return null;
+    const map = {};
+    cv.sizeVariants.forEach(sv => { map[sv.size] = sv; }); // { size → { size, price, stock, sku } }
+    return map;
+  }, [product.colorVariants, selectedColor]);
+
+  // Convenience: just stock per size
+  const colorSizeStock = useMemo(() => {
+    if (!colorSizeData) return null;
+    const map = {};
+    Object.entries(colorSizeData).forEach(([s, sv]) => { map[s] = sv.stock; });
+    return map;
+  }, [colorSizeData]);
+
+  // Price for the currently selected size (per-color sizeVariants OR global variants)
+  const selectedSizePrice = useMemo(() => {
+    if (!selectedSize) return null;
+    // 1. Per-color sizeVariants (multi-color products)
+    if (colorSizeData) {
+      const sv = colorSizeData[selectedSize];
+      if (sv?.price && sv.price !== product.price) return sv.price;
+    }
+    // 2. Global variants (single-color products)
+    const gv = product.variants?.find(v => v.size === selectedSize);
+    if (gv?.price && gv.price !== product.price) return gv.price;
+    return null;
+  }, [colorSizeData, selectedSize, product.price, product.variants]);
+
+  // Out-of-stock: if selected color has sizeVariants, check if ANY size has stock
+  const colorHasAnyStock = useMemo(() => {
+    if (!colorSizeStock) return null; // unknown, rely on global
+    return Object.values(colorSizeStock).some(s => s > 0);
+  }, [colorSizeStock]);
+
+  const outOfStock = colorHasAnyStock !== null
+    ? !colorHasAnyStock // use per-color stock
+    : (product.stock === 0
+       || product.availability === 'out_of_stock'
+       || product.availability === 'Out of Stock');
 
   const handleWishlist = () => {
     const added = toggleWishlist(product.id);
@@ -70,7 +122,33 @@ export default function ProductPage() {
     navigate('/checkout');
   };
 
-  const images = product.images?.length ? product.images : ['/images/placeholder.jpg'];
+  const handleNotifyMe = () => {
+    if (!user) {
+      navigate('/login', { state: { from: `/product/${product.id}` } });
+      return;
+    }
+    try {
+      const key = 'shopnow:notifications';
+      const list = JSON.parse(localStorage.getItem(key) || '[]');
+      if (!list.some(n => n.productId === id)) {
+        list.push({ productId: id, productName: product.name, userEmail: user.email, userName: user.name || user.email.split('@')[0], date: new Date().toISOString() });
+        localStorage.setItem(key, JSON.stringify(list));
+      }
+      setNotified(true);
+      toast.success(`We'll notify you at ${user.email} when "${product.name}" is back in stock!`);
+    } catch {
+      toast.error('Could not set reminder. Please try again.');
+    }
+  };
+
+  const baseImages = product.images?.length ? product.images : ['/images/placeholder.jpg'];
+  // Resolve selected color's images (supports both new 'images[]' and legacy 'image')
+  const selectedCv = product.colorVariants?.[selectedColor];
+  const cvImages = selectedCv
+    ? (selectedCv.images?.length ? selectedCv.images : (selectedCv.image ? [selectedCv.image] : []))
+    : [];
+  // Myntra behavior: when a color has its own images, show ONLY those — no mixing
+  const images = cvImages.length ? cvImages : baseImages;
 
   return (
     <div style={{ paddingTop: 'var(--nav-height)', minHeight: '100vh' }}>
@@ -138,40 +216,104 @@ export default function ProductPage() {
                 {product.name}
               </h1>
 
-              {/* Rating */}
-              {product.rating && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                  <div style={{ background: '#14958f', color: 'white', borderRadius: 6, padding: '4px 8px', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    {product.rating} <Star size={12} fill="white" />
+              {/* Rating — only shown when real reviews exist */}
+              {(() => {
+                const rv = reviewSummary(product.id);
+                if (!rv || rv.count === 0) return null;
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                    <div style={{ background: '#14958f', color: 'white', borderRadius: 6, padding: '4px 8px', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {rv.avg} <Star size={12} fill="white" />
+                    </div>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
+                      {rv.count.toLocaleString('en-IN')} {rv.count === 1 ? 'rating' : 'ratings'}
+                    </span>
                   </div>
-                  <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
-                    {product.reviews?.toLocaleString('en-IN')} ratings
-                  </span>
-                </div>
-              )}
+                );
+              })()}
 
-              {/* Price */}
+              {/* Price — updates when a size with different price is selected */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-                <span style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 900 }}>{inr(product.price)}</span>
+                <span style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 900 }}>
+                  {inr(selectedSizePrice || product.price)}
+                </span>
                 {product.originalPrice > product.price && (
                   <>
                     <span style={{ color: 'var(--text-muted)', fontSize: 18, textDecoration: 'line-through' }}>{inr(product.originalPrice)}</span>
                     <span style={{ color: '#22c55e', fontWeight: 700, fontSize: 16 }}>{product.discount}% off</span>
                   </>
                 )}
+                {selectedSizePrice && selectedSizePrice !== product.price && (
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>for {selectedSize}</span>
+                )}
               </div>
 
               {/* Colors */}
-              {product.colors?.length > 0 && (
+              {product.colorVariants?.length > 0 ? (
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 10 }}>
+                    MORE COLORS
+                    {product.colorVariants[selectedColor]?.name && (
+                      <span style={{ color: 'var(--accent)', marginLeft: 8 }}>· {product.colorVariants[selectedColor].name}</span>
+                    )}
+                  </div>
+
+                  {product.colorDisplayMode === 'image' ? (
+                    /* ── Myntra-style: product photo per color ── */
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      {product.colorVariants.map((cv, i) => {
+                        const thumb = cv.images?.[0] || cv.image || null;
+                        const isSelected = i === selectedColor;
+                        return (
+                          <button key={cv.id || i}
+                            onClick={() => { setSelectedColor(i); setImgIdx(0); }}
+                            title={cv.name}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                            <div style={{
+                              width: 72, height: 90, borderRadius: 6, overflow: 'hidden',
+                              border: isSelected ? '2.5px solid var(--accent)' : '2px solid var(--border-glass)',
+                              background: 'var(--bg-glass)', transition: 'border 0.15s',
+                            }}>
+                              {thumb
+                                ? <img src={thumb} alt={cv.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                : <div style={{ width: '100%', height: '100%', background: cv.hex }} />}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    /* ── Swatch mode: color circles ── */
+                    <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                      {product.colorVariants.map((cv, i) => {
+                        const isSelected = i === selectedColor;
+                        return (
+                          <button key={cv.id || i}
+                            onClick={() => { setSelectedColor(i); setImgIdx(0); }}
+                            title={cv.name}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                            <div style={{
+                              width: 32, height: 32, borderRadius: '50%', background: cv.hex,
+                              outline: isSelected ? `2.5px solid var(--accent)` : '2px solid rgba(0,0,0,0.1)',
+                              outlineOffset: 3, border: '1.5px solid rgba(0,0,0,0.08)',
+                              transition: 'outline 0.15s',
+                            }} />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ) : product.colors?.length > 0 && (
                 <div style={{ marginBottom: 20 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>Color</div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     {product.colors.map((c, i) => (
                       <button key={i} onClick={() => setSelectedColor(i)}
                         style={{
-                          width: 28, height: 28, borderRadius: '50%', background: c, border: 'none', cursor: 'pointer',
+                          width: 32, height: 32, borderRadius: '50%', background: c, border: 'none', cursor: 'pointer',
                           outline: i === selectedColor ? `2px solid var(--accent)` : '2px solid transparent',
-                          outlineOffset: 2,
+                          outlineOffset: 3,
                         }}
                       />
                     ))}
@@ -182,28 +324,48 @@ export default function ProductPage() {
               {/* Sizes */}
               {product.sizes?.length > 0 && (
                 <div style={{ marginBottom: 22 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                    Select size {selectedSize && <span style={{ color: 'var(--accent)' }}>· {selectedSize}</span>}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      Select size {selectedSize && !outOfStock && <span style={{ color: 'var(--accent)' }}>· {selectedSize}</span>}
+                      {outOfStock && <span style={{ color: '#ef4444', marginLeft: 8, fontWeight: 700 }}>— OUT OF STOCK</span>}
+                    </div>
+                    <button onClick={() => setShowSizeChart(true)}
+                      style={{ fontSize: 12, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'var(--font-body)', textDecoration: 'underline' }}>
+                      📏 Size guide
+                    </button>
                   </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {product.sizes.map((s) => (
-                      <button key={s} onClick={() => setSelectedSize(s)}
-                        style={{
-                          minWidth: 44, padding: '8px 12px', borderRadius: 10,
-                          border: `1.5px solid ${selectedSize === s ? 'var(--accent)' : 'var(--border-glass)'}`,
-                          background: selectedSize === s ? 'rgba(124,106,255,0.1)' : 'transparent',
-                          color: selectedSize === s ? 'var(--accent)' : 'var(--text-primary)',
-                          fontWeight: 600, fontSize: 14, cursor: 'pointer',
-                          fontFamily: 'var(--font-body)',
-                          transition: 'all var(--transition)',
-                        }}>
-                        {s}
-                      </button>
-                    ))}
+                    {product.sizes.map((s) => {
+                      // Size disabled if: global out-of-stock OR per-color stock = 0
+                      const colorStock = colorSizeStock ? (colorSizeStock[s] ?? null) : null;
+                      const sizeOos = outOfStock || (colorStock !== null && colorStock === 0);
+                      const isSelected = selectedSize === s && !sizeOos;
+                      return (
+                        <button key={s}
+                          disabled={sizeOos}
+                          onClick={() => !sizeOos && setSelectedSize(s)}
+                          title={colorStock !== null ? `${colorStock} left` : undefined}
+                          style={{
+                            minWidth: 44, padding: '8px 12px', borderRadius: 10,
+                            border: `1.5px solid ${isSelected ? 'var(--accent)' : 'var(--border-glass)'}`,
+                            background: isSelected ? 'rgba(124,106,255,0.1)' : 'transparent',
+                            color: sizeOos ? 'var(--text-muted)' : isSelected ? 'var(--accent)' : 'var(--text-primary)',
+                            fontWeight: 600, fontSize: 14,
+                            cursor: sizeOos ? 'not-allowed' : 'pointer',
+                            fontFamily: 'var(--font-body)',
+                            textDecoration: sizeOos ? 'line-through' : 'none',
+                            opacity: sizeOos ? 0.45 : 1,
+                            transition: 'all var(--transition)',
+                            position: 'relative',
+                          }}>
+                          {s}
+                          {colorStock !== null && colorStock > 0 && colorStock <= 5 && (
+                            <span style={{ position: 'absolute', top: -6, right: -4, fontSize: 8, fontWeight: 700, color: '#ea580c', background: 'var(--bg-card)', borderRadius: 4, padding: '1px 3px', border: '1px solid rgba(234,88,12,0.3)' }}>{colorStock}</span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <Link to="/size-guide" style={{ fontSize: 12, color: 'var(--accent)', textDecoration: 'none', marginTop: 8, display: 'inline-block' }}>
-                    Size guide
-                  </Link>
                 </div>
               )}
 
@@ -230,35 +392,59 @@ export default function ProductPage() {
               </div>
 
               {/* CTA buttons */}
-              <div style={{ display: 'flex', gap: 10, marginBottom: 22, flexWrap: 'wrap' }}>
-                <motion.button
-                  onClick={handleAddToCart}
-                  disabled={outOfStock}
-                  whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                  style={{
-                    flex: 1, minWidth: 140, padding: '14px 20px',
-                    background: addedToCart ? '#22c55e' : 'var(--bg-glass)',
-                    border: `1.5px solid ${addedToCart ? '#22c55e' : 'var(--accent)'}`,
-                    borderRadius: 50, color: addedToCart ? 'white' : 'var(--accent)',
-                    fontWeight: 700, fontSize: 14, cursor: outOfStock ? 'not-allowed' : 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    fontFamily: 'var(--font-body)', transition: 'all 0.2s',
-                    opacity: outOfStock ? 0.5 : 1,
-                  }}
-                >
-                  {addedToCart ? <CheckCircle size={16} /> : <ShoppingBag size={16} />}
-                  {outOfStock ? 'Out of stock' : addedToCart ? 'Added to bag!' : 'Add to bag'}
-                </motion.button>
-                <motion.button
-                  onClick={handleBuyNow}
-                  disabled={outOfStock}
-                  whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                  className="btn btn-primary"
-                  style={{ flex: 1, minWidth: 140, justifyContent: 'center', opacity: outOfStock ? 0.5 : 1 }}
-                >
-                  Buy now
-                </motion.button>
-              </div>
+              {outOfStock ? (
+                /* ── OUT OF STOCK: single Notify Me button ── */
+                <div style={{ marginBottom: 22 }}>
+                  <motion.button
+                    onClick={handleNotifyMe}
+                    whileHover={{ scale: notified ? 1 : 1.02 }}
+                    whileTap={{ scale: 0.97 }}
+                    style={{
+                      width: '100%', padding: '15px 24px', borderRadius: 50,
+                      background: notified ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.08)',
+                      border: `1.5px solid ${notified ? '#22c55e' : '#ef4444'}`,
+                      color: notified ? '#16a34a' : '#ef4444',
+                      fontWeight: 700, fontSize: 15,
+                      cursor: notified ? 'default' : 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+                      fontFamily: 'var(--font-body)', transition: 'all 0.2s',
+                    }}>
+                    {notified ? <BellRing size={18} /> : <Bell size={18} />}
+                    {notified ? `Reminder set — we'll email you when back in stock` : 'Notify Me When Back in Stock'}
+                  </motion.button>
+                  {!user && (
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', marginTop: 8 }}>
+                      <Link to="/login" style={{ color: 'var(--accent)' }}>Sign in</Link> to receive email notifications
+                    </p>
+                  )}
+                </div>
+              ) : (
+                /* ── IN STOCK: normal Add to bag + Buy now ── */
+                <div style={{ display: 'flex', gap: 10, marginBottom: 22, flexWrap: 'wrap' }}>
+                  <motion.button
+                    onClick={handleAddToCart}
+                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                    style={{
+                      flex: 1, minWidth: 140, padding: '14px 20px',
+                      background: addedToCart ? '#22c55e' : 'var(--bg-glass)',
+                      border: `1.5px solid ${addedToCart ? '#22c55e' : 'var(--accent)'}`,
+                      borderRadius: 50, color: addedToCart ? 'white' : 'var(--accent)',
+                      fontWeight: 700, fontSize: 14, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      fontFamily: 'var(--font-body)', transition: 'all 0.2s',
+                    }}>
+                    {addedToCart ? <CheckCircle size={16} /> : <ShoppingBag size={16} />}
+                    {addedToCart ? 'Added to bag!' : 'Add to bag'}
+                  </motion.button>
+                  <motion.button
+                    onClick={handleBuyNow}
+                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                    className="btn btn-primary"
+                    style={{ flex: 1, minWidth: 140, justifyContent: 'center' }}>
+                    Buy now
+                  </motion.button>
+                </div>
+              )}
 
               <div style={{ display: 'flex', gap: 10, marginBottom: 24 }}>
                 <button onClick={handleWishlist}
@@ -272,11 +458,22 @@ export default function ProductPage() {
                   <Heart size={16} fill={wished ? '#ff6a9a' : 'none'} />
                   {wished ? 'Wishlisted' : 'Wishlist'}
                 </button>
-                <Link to="/tryon/live" state={{ productId: product.id }}
-                  className="btn btn-ghost"
-                  style={{ textDecoration: 'none', flex: 1, justifyContent: 'center', gap: 8 }}>
-                  <Sparkles size={16} /> Try-On
-                </Link>
+                <motion.button
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setTryOnModalOpen(true)}
+                  style={{
+                    flex: 1, padding: '11px 16px', borderRadius: 50,
+                    background: 'transparent', border: '1px solid var(--accent)',
+                    color: 'var(--accent)', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    fontWeight: 600, fontSize: 14, fontFamily: 'var(--font-body)', transition: 'all var(--transition)',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(124,106,255,0.12)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <Sparkles size={16} /> Try in 3D
+                </motion.button>
               </div>
 
               {/* Trust badges */}
@@ -318,6 +515,122 @@ export default function ProductPage() {
       </div>
 
       <style>{`@media(max-width:768px){.product-grid{grid-template-columns:1fr!important;}}`}</style>
+
+      {showSizeChart && (
+        <SizeChartModal
+          product={product}
+          gender={product.gender}
+          category={product.category}
+          onClose={() => setShowSizeChart(false)}
+        />
+      )}
+
+      {/* ── Try-On Mode Selection Modal ── */}
+      <AnimatePresence>
+        {tryOnModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setTryOnModalOpen(false)}
+            style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)',
+              backdropFilter: 'blur(10px)', zIndex: 3000,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: 'var(--bg-card)', border: '1px solid var(--border-glass)',
+                borderRadius: 24, padding: 32, maxWidth: 480, width: '100%',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{
+                    width: 40, height: 40, borderRadius: '50%',
+                    background: 'var(--gradient-1)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <Sparkles size={20} color="white" />
+                  </div>
+                  <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700 }}>Try On in 3D</h3>
+                </div>
+                <button onClick={() => setTryOnModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
+                  <X size={20} />
+                </button>
+              </div>
+              <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 24, lineHeight: 1.6 }}>
+                Choose how you'd like to try on <strong style={{ color: 'var(--text-primary)' }}>{product.name}</strong>
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {/* Live Camera */}
+                <motion.button
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => { setTryOnModalOpen(false); navigate('/tryon/live', { state: { product } }); }}
+                  style={{
+                    width: '100%', padding: '20px 24px',
+                    background: 'var(--gradient-1)', border: 'none', borderRadius: 16,
+                    cursor: 'pointer', textAlign: 'left',
+                    boxShadow: '0 6px 24px var(--accent-glow)',
+                    display: 'flex', alignItems: 'center', gap: 16,
+                  }}
+                >
+                  <div style={{
+                    width: 48, height: 48, borderRadius: 14,
+                    background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(10px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}>
+                    <Camera size={24} color="white" />
+                  </div>
+                  <div>
+                    <p style={{ fontWeight: 700, fontSize: 16, color: 'white', marginBottom: 4, fontFamily: 'var(--font-body)' }}>Live Camera 3D View</p>
+                    <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.4, fontFamily: 'var(--font-body)' }}>
+                      Open your camera — auto-captures 4 angles as you turn. Just like Lenskart!
+                    </p>
+                  </div>
+                </motion.button>
+
+                {/* Upload Photos */}
+                <motion.button
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => { setTryOnModalOpen(false); navigate('/tryon/live', { state: { product, startPhase: 'upload' } }); }}
+                  style={{
+                    width: '100%', padding: '20px 24px',
+                    background: 'var(--bg-glass)', border: '1px solid var(--border-glass)',
+                    borderRadius: 16, cursor: 'pointer', textAlign: 'left',
+                    display: 'flex', alignItems: 'center', gap: 16,
+                    transition: 'all var(--transition)',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'rgba(124,106,255,0.06)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-glass)'; e.currentTarget.style.background = 'var(--bg-glass)'; }}
+                >
+                  <div style={{
+                    width: 48, height: 48, borderRadius: 14,
+                    background: 'rgba(124,106,255,0.1)', border: '1px solid rgba(124,106,255,0.2)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}>
+                    <Upload size={22} color="var(--accent)" />
+                  </div>
+                  <div>
+                    <p style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-primary)', marginBottom: 4, fontFamily: 'var(--font-body)' }}>Upload Photos</p>
+                    <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.4, fontFamily: 'var(--font-body)' }}>
+                      Manually upload 4 photos from different angles for 3D reconstruction.
+                    </p>
+                  </div>
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

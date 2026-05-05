@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShoppingBag, Search, Menu, X, Sparkles, Heart, Sun, Moon, User, ChevronDown, Package, LogOut, Settings, Bell, Globe } from 'lucide-react';
+import { ShoppingBag, Search, Menu, X, Sparkles, Heart, Sun, Moon, User, ChevronDown, Package, LogOut, Settings, Bell, Globe, Clock } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { useAuth } from '../context/AuthContext';
@@ -9,6 +9,9 @@ import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 import { useNotifications } from '../context/NotifContext';
 import { useLang } from '../context/LangContext';
+import { useBrand } from '../context/BrandContext';
+import { useCatalog } from '../context/CatalogContext';
+import { scoreProduct } from '../utils/searchUtils';
 
 const NAV_LINKS = [
   { label: 'home', path: '/' },
@@ -23,8 +26,10 @@ export default function Navbar() {
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
   const { mode, toggle, isDark } = useTheme();
   const toast = useToast();
+  const { logoUrl, brandName } = useBrand();
   const { unreadCount } = useNotifications();
   const { t, lang, cycle } = useLang();
+  const { products } = useCatalog();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -33,7 +38,18 @@ export default function Navbar() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [recentSearches, setRecentSearches] = useState([]);
   const userMenuRef = useRef(null);
+
+  const suggestions = useMemo(() => {
+    if (!searchQuery.trim() || !searchOpen) return [];
+    return products
+      .map(p => ({ p, score: scoreProduct(p, searchQuery.trim()) }))
+      .filter(r => r.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 6)
+      .map(r => r.p);
+  }, [searchQuery, searchOpen, products]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -55,13 +71,49 @@ export default function Navbar() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  useEffect(() => {
+    if (searchOpen) {
+      const key = isAuthenticated && user ? `sn_searches_${user.id}` : 'sn_searches_guest';
+      try { setRecentSearches(JSON.parse(localStorage.getItem(key) || '[]')); } catch { setRecentSearches([]); }
+    }
+  }, [searchOpen, isAuthenticated, user?.id]);
+
+  const getSearchKey = () => isAuthenticated && user ? `sn_searches_${user.id}` : 'sn_searches_guest';
+
+  const saveSearch = (term) => {
+    if (!term) return;
+    const key = getSearchKey();
+    let current = [];
+    try { current = JSON.parse(localStorage.getItem(key) || '[]'); } catch {}
+    const updated = [term, ...current.filter(s => s !== term)].slice(0, 8);
+    localStorage.setItem(key, JSON.stringify(updated));
+    setRecentSearches(updated);
+  };
+
+  const removeRecent = (term) => {
+    const key = getSearchKey();
+    const updated = recentSearches.filter(s => s !== term);
+    localStorage.setItem(key, JSON.stringify(updated));
+    setRecentSearches(updated);
+  };
+
+  const clearRecent = () => {
+    localStorage.removeItem(getSearchKey());
+    setRecentSearches([]);
+  };
+
+  const doSearch = (q) => {
+    const term = (q !== undefined ? q : searchQuery).trim();
+    if (!term) return;
+    saveSearch(term);
+    navigate(`/search?q=${encodeURIComponent(term)}`);
+    setSearchOpen(false);
+    setSearchQuery('');
+  };
+
   const handleSearch = (e) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-      setSearchOpen(false);
-      setSearchQuery('');
-    }
+    doSearch();
   };
 
   const handleLogout = () => {
@@ -92,17 +144,25 @@ export default function Navbar() {
         <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
           {/* Logo */}
           <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <motion.div whileHover={{ scale: 1.05 }} style={{
-              width: 36, height: 36, borderRadius: 10, background: 'var(--gradient-1)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 0 20px var(--accent-glow)',
-            }}>
-              <Sparkles size={18} color="white" />
+            <motion.div whileHover={{ scale: 1.05 }} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {logoUrl ? (
+                <img src={logoUrl} alt={brandName} style={{ height: 36, maxWidth: 160, objectFit: 'contain', display: 'block' }} />
+              ) : (
+                <>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 10, background: 'var(--gradient-1)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 0 20px var(--accent-glow)',
+                  }}>
+                    <Sparkles size={18} color="white" />
+                  </div>
+                  <span style={{
+                    fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 800,
+                    background: 'var(--gradient-1)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+                  }}>{brandName}</span>
+                </>
+              )}
             </motion.div>
-            <span style={{
-              fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 800,
-              background: 'var(--gradient-1)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-            }}>ShopNow</span>
           </Link>
 
           {/* Desktop nav */}
@@ -265,26 +325,115 @@ export default function Navbar() {
         {searchOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onClick={() => setSearchOpen(false)}
-            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)', zIndex: 2000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 120 }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(10px)', zIndex: 2000, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 80 }}
           >
-            <motion.form initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -20, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()} onSubmit={handleSearch}
-              style={{ width: '100%', maxWidth: 600, padding: '0 24px' }}
+            <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -20, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{ width: '100%', maxWidth: 620, padding: '0 24px' }}
             >
-              <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-glass-hover)', borderRadius: 16, display: 'flex', alignItems: 'center', padding: '16px 20px', gap: 12 }}>
-                <Search size={22} color="var(--accent)" />
-                <input autoFocus value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={t('searchPlaceholder')}
-                  style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-primary)', fontSize: 18, fontFamily: 'var(--font-body)' }}
-                />
-                <button type="button" onClick={() => setSearchOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
-                  <X size={20} />
-                </button>
-              </div>
+              {/* Input */}
+              <form onSubmit={handleSearch}>
+                <div style={{
+                  background: 'var(--bg-card)', border: '1px solid var(--border-glass-hover)',
+                  borderRadius: (suggestions.length > 0 || (!searchQuery && recentSearches.length > 0)) ? '16px 16px 0 0' : 16,
+                  display: 'flex', alignItems: 'center', padding: '16px 20px', gap: 12,
+                }}>
+                  <Search size={22} color="var(--accent)" />
+                  <input autoFocus value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by name, color, brand, category…"
+                    style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text-primary)', fontSize: 18, fontFamily: 'var(--font-body)' }}
+                  />
+                  {searchQuery && (
+                    <button type="button" onClick={() => setSearchQuery('')} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '0 4px' }}>
+                      <X size={16} />
+                    </button>
+                  )}
+                  <button type="button" onClick={() => setSearchOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                    <X size={20} />
+                  </button>
+                </div>
+              </form>
+
+              {/* Dropdown: recent searches or live product suggestions */}
+              {(suggestions.length > 0 || (!searchQuery && recentSearches.length > 0)) && (
+                <div style={{
+                  background: 'var(--bg-card)', border: '1px solid var(--border-glass-hover)',
+                  borderTop: '1px solid var(--border-glass)', borderRadius: '0 0 16px 16px',
+                  overflow: 'hidden', maxHeight: 380, overflowY: 'auto',
+                }}>
+                  {/* Recent searches */}
+                  {!searchQuery && recentSearches.length > 0 && (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px 8px', borderBottom: '1px solid var(--border-glass)' }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--text-muted)' }}>Recent</span>
+                        <button onClick={clearRecent} style={{ background: 'none', border: 'none', fontSize: 12, color: 'var(--accent)', cursor: 'pointer', fontFamily: 'var(--font-body)' }}>Clear all</button>
+                      </div>
+                      {recentSearches.map((s) => (
+                        <div key={s} onClick={() => doSearch(s)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', cursor: 'pointer' }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-glass)'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                        >
+                          <Clock size={15} color="var(--text-muted)" />
+                          <span style={{ flex: 1, fontSize: 14, color: 'var(--text-primary)' }}>{s}</span>
+                          <button onClick={(e) => { e.stopPropagation(); removeRecent(s); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: 2 }}>
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </>
+                  )}
+
+                  {/* Live product suggestions */}
+                  {searchQuery && suggestions.length > 0 && (
+                    <>
+                      {suggestions.map((p) => (
+                        <div key={p.id}
+                          onClick={() => { saveSearch(searchQuery.trim()); navigate(`/product/${p.id}`); setSearchOpen(false); setSearchQuery(''); }}
+                          style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', cursor: 'pointer' }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-glass)'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                        >
+                          <div style={{ width: 44, height: 44, borderRadius: 8, background: 'var(--bg-glass)', overflow: 'hidden', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {p.images?.[0]
+                              ? <img src={p.images[0]} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              : <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)' }}>{p.name?.[0]}</span>}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>₹{p.price} · {p.category}</div>
+                          </div>
+                        </div>
+                      ))}
+                      <div onClick={() => doSearch()}
+                        style={{ padding: '11px 20px', borderTop: '1px solid var(--border-glass)', cursor: 'pointer', color: 'var(--accent)', fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-glass)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <Search size={15} /> See all results for "{searchQuery}"
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Popular / trending searches */}
+              {!searchQuery && (
+                <div style={{ marginTop: 14, display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+                  {['T-Shirts', 'Jeans', 'Dresses', 'Kurtas', 'White shirt', 'Blue jeans', 'Sarees'].map((term) => (
+                    <button key={term} onClick={() => doSearch(term)}
+                      style={{ background: 'var(--bg-glass)', border: '1px solid var(--border-glass)', borderRadius: 20, padding: '6px 14px', fontSize: 13, color: 'var(--text-secondary)', cursor: 'pointer', fontFamily: 'var(--font-body)', transition: 'all 0.15s' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--accent)'; e.currentTarget.style.color = 'white'; e.currentTarget.style.borderColor = 'var(--accent)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--bg-glass)'; e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'var(--border-glass)'; }}
+                    >{term}</button>
+                  ))}
+                </div>
+              )}
+
               <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 12, textAlign: 'center' }}>
                 Press Enter to search · Esc to close
               </p>
-            </motion.form>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

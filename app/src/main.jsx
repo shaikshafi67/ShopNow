@@ -13,8 +13,12 @@ import { ReviewsProvider } from './context/ReviewsContext'
 import { NotifProvider } from './context/NotifContext'
 import { LangProvider } from './context/LangContext'
 import { BannersProvider } from './context/BannersContext'
+import { BrandProvider } from './context/BrandContext'
 import { CollectionsProvider } from './context/CollectionsContext'
 import { DiscountsProvider } from './context/DiscountsContext'
+import { PagesProvider } from './context/PagesContext'
+import { AnnouncementsProvider } from './context/AnnouncementsContext'
+import { PromoProvider } from './context/PromoContext'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -28,13 +32,21 @@ createRoot(document.getElementById('root')).render(
                   <OrdersProvider>
                     <ReviewsProvider>
                       <NotifProvider>
+                        <BrandProvider>
                         <BannersProvider>
                           <CollectionsProvider>
                             <DiscountsProvider>
-                              <App />
+                              <PagesProvider>
+                                <AnnouncementsProvider>
+                                  <PromoProvider>
+                                    <App />
+                                  </PromoProvider>
+                                </AnnouncementsProvider>
+                              </PagesProvider>
                             </DiscountsProvider>
                           </CollectionsProvider>
                         </BannersProvider>
+                        </BrandProvider>
                       </NotifProvider>
                     </ReviewsProvider>
                   </OrdersProvider>

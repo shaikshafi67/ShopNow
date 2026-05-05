@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import Navbar from './components/Navbar';
@@ -7,6 +8,8 @@ import MenPage from './pages/MenPage';
 import WomenPage from './pages/WomenPage';
 import ProductPage from './pages/ProductPage';
 import LiveTryOnPage from './pages/LiveTryOnPage';
+import ZaraTryOnPage from './pages/ZaraTryOnPage';
+import TryOn3DPage from './pages/TryOn3DPage';
 import CartPage from './pages/CartPage';
 import WishlistPage from './pages/WishlistPage';
 import SearchPage from './pages/SearchPage';
@@ -28,6 +31,12 @@ import AdminUsers from './pages/admin/AdminUsers';
 import AdminAnalytics from './pages/admin/AdminAnalytics';
 import AdminBanners from './pages/admin/AdminBanners';
 import AdminDiscounts from './pages/admin/AdminDiscounts';
+import AdminPages from './pages/admin/AdminPages';
+import AdminAddProduct from './pages/admin/AdminAddProduct';
+import AdminProductCSV from './pages/admin/AdminProductCSV';
+import AdminBranding from './pages/admin/AdminBranding';
+import AdminAnnouncements from './pages/admin/AdminAnnouncements';
+import AdminPromo from './pages/admin/AdminPromo';
 import {
   SizeGuidePage,
   ShippingInfoPage,
@@ -42,6 +51,12 @@ import {
   NewArrivalsPage,
   SalePage,
 } from './pages/InfoPages';
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  return null;
+}
 
 function PageWrapper({ children }) {
   return (
@@ -58,11 +73,12 @@ function PageWrapper({ children }) {
 
 function AppRoutes() {
   const location = useLocation();
-  const isTryOn = location.pathname === '/tryon' || location.pathname === '/tryon/live';
+  const isTryOn = location.pathname.startsWith('/tryon');
   const isAdmin = location.pathname.startsWith('/admin');
 
   return (
     <>
+      <ScrollToTop />
       {!isAdmin && <Navbar />}
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
@@ -70,8 +86,9 @@ function AppRoutes() {
           <Route path="/men" element={<PageWrapper><MenPage /></PageWrapper>} />
           <Route path="/women" element={<PageWrapper><WomenPage /></PageWrapper>} />
           <Route path="/product/:id" element={<PageWrapper><ProductPage /></PageWrapper>} />
+          <Route path="/tryon/3d"   element={<PageWrapper><TryOn3DPage /></PageWrapper>} />
+          <Route path="/tryon"     element={<Navigate to="/tryon/live" replace />} />
           <Route path="/tryon/live" element={<PageWrapper><LiveTryOnPage /></PageWrapper>} />
-          <Route path="/tryon" element={<Navigate to="/tryon/live" replace />} />
 
           {/* Auth */}
           <Route path="/login" element={<PageWrapper><LoginPage /></PageWrapper>} />
@@ -94,12 +111,19 @@ function AppRoutes() {
           <Route path="/admin" element={<RequireAuth role="admin"><AdminLayout /></RequireAuth>}>
             <Route index element={<AdminDashboard />} />
             <Route path="products" element={<AdminProducts />} />
+            <Route path="products/add" element={<AdminAddProduct />} />
+            <Route path="products/edit/:id" element={<AdminAddProduct />} />
+            <Route path="products/csv" element={<AdminProductCSV />} />
             <Route path="collections" element={<AdminCollections />} />
             <Route path="orders" element={<AdminOrders />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="analytics" element={<AdminAnalytics />} />
             <Route path="banners" element={<AdminBanners />} />
             <Route path="discounts" element={<AdminDiscounts />} />
+            <Route path="pages" element={<AdminPages />} />
+            <Route path="branding" element={<AdminBranding />} />
+            <Route path="announcements" element={<AdminAnnouncements />} />
+            <Route path="promo" element={<AdminPromo />} />
           </Route>
 
           {/* Shop helpers */}

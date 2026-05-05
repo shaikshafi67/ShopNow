@@ -4,25 +4,7 @@ import { motion } from 'framer-motion';
 import { Search as SearchIcon, ArrowRight } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
 import { useCatalog } from '../context/CatalogContext';
-
-function scoreProduct(product, query) {
-  const q = query.toLowerCase();
-  const name = (product.name || '').toLowerCase();
-  const brand = (product.brand || '').toLowerCase();
-  const category = (product.category || '').toLowerCase();
-  const description = (product.description || '').toLowerCase();
-  const tag = (product.tag || '').toLowerCase();
-
-  let score = 0;
-  if (name === q) score += 100;
-  if (name.startsWith(q)) score += 40;
-  if (name.includes(q)) score += 20;
-  if (brand.includes(q)) score += 15;
-  if (category.includes(q)) score += 12;
-  if (tag.includes(q)) score += 8;
-  if (description.includes(q)) score += 4;
-  return score;
-}
+import { scoreProduct } from '../utils/searchUtils';
 
 export default function SearchPage() {
   const [params] = useSearchParams();

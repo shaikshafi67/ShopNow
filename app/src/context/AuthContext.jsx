@@ -50,6 +50,27 @@ export function AuthProvider({ children }) {
 
   useEffect(() => { write('users', users); }, [users]);
 
+  // Sync users from localStorage when another tab registers/updates
+  useEffect(() => {
+    function refreshUsers() {
+      const fresh = read('users', null);
+      if (fresh && Array.isArray(fresh) && fresh.length > 0) {
+        setUsers(fresh);
+      }
+    }
+    // Storage event = another tab changed localStorage
+    function onStorage(e) {
+      if (e.key === 'shopnow:users') refreshUsers();
+    }
+    // Focus event = user switches back to this tab
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', refreshUsers);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('focus', refreshUsers);
+    };
+  }, []);
+
   useEffect(() => {
     try {
       if (sessionId) sessionStorage.setItem('shopnow:session', sessionId);

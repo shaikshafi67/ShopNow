@@ -1,139 +1,291 @@
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import InfoPage from './InfoPage';
+import { usePages } from '../context/PagesContext';
+
+/* Renders a page whose content is managed via the admin Pages editor (rich HTML). */
+function DynamicInfoPage({ pageId, fallbackTitle }) {
+  const { getPage } = usePages();
+  const page = getPage(pageId);
+  const title = page?.title ?? fallbackTitle;
+  const content = page?.content ?? '<p>Content coming soon.</p>';
+
+  return (
+    <InfoPage title={title} htmlContent={content} />
+  );
+}
+
+export function PrivacyPage()  { return <DynamicInfoPage pageId="privacy"  fallbackTitle="Privacy Policy" />; }
+export function TermsPage()    { return <DynamicInfoPage pageId="terms"    fallbackTitle="Terms of Use" />; }
+export function ShippingInfoPage() { return <DynamicInfoPage pageId="shipping" fallbackTitle="Shipping Information" />; }
+export function ReturnsPage()  { return <DynamicInfoPage pageId="returns"  fallbackTitle="Returns & Exchanges" />; }
+export function AboutPage()    { return <DynamicInfoPage pageId="about"    fallbackTitle="About ShopNow" />; }
+export function ContactPage()  { return <DynamicInfoPage pageId="contact"  fallbackTitle="Contact Us" />; }
+export function CareersPage()  { return <DynamicInfoPage pageId="careers"  fallbackTitle="Careers" />; }
+
+/* ── Pages without context editing (utility/catalog pages) ── */
+
+/* ─── Size Guide ─── */
+const MEN_SHIRTS = [
+  { size:'S',    chestIn:'36–38', chestCm:'91–96',   waistIn:'30–32', waistCm:'76–81',  sleeveIn:'32½', sleeveCm:'82' },
+  { size:'M',    chestIn:'38–40', chestCm:'96–102',  waistIn:'32–34', waistCm:'81–86',  sleeveIn:'33',  sleeveCm:'84' },
+  { size:'L',    chestIn:'40–42', chestCm:'102–107', waistIn:'34–36', waistCm:'86–91',  sleeveIn:'33½', sleeveCm:'85' },
+  { size:'XL',   chestIn:'42–44', chestCm:'107–112', waistIn:'36–38', waistCm:'91–96',  sleeveIn:'34',  sleeveCm:'86' },
+  { size:'XXL',  chestIn:'44–46', chestCm:'112–117', waistIn:'38–40', waistCm:'96–102', sleeveIn:'34½', sleeveCm:'87' },
+  { size:'XXXL', chestIn:'46–48', chestCm:'117–122', waistIn:'40–42', waistCm:'102–107',sleeveIn:'35',  sleeveCm:'89' },
+];
+
+const WOMEN_TOPS = [
+  { size:'XS',  bustIn:'30–31', bustCm:'76–79',   waistIn:'24–25', waistCm:'61–64', hipIn:'33–34', hipCm:'84–86'  },
+  { size:'S',   bustIn:'32–33', bustCm:'81–84',   waistIn:'26–27', waistCm:'66–69', hipIn:'35–36', hipCm:'89–91'  },
+  { size:'M',   bustIn:'34–35', bustCm:'86–89',   waistIn:'28–29', waistCm:'71–74', hipIn:'37–38', hipCm:'94–97'  },
+  { size:'L',   bustIn:'36–37', bustCm:'91–94',   waistIn:'30–31', waistCm:'76–79', hipIn:'39–40', hipCm:'99–102' },
+  { size:'XL',  bustIn:'38–39', bustCm:'97–99',   waistIn:'32–33', waistCm:'81–84', hipIn:'41–42', hipCm:'104–107'},
+  { size:'XXL', bustIn:'40–41', bustCm:'102–104', waistIn:'34–35', waistCm:'86–89', hipIn:'43–44', hipCm:'109–112'},
+];
+
+const WOMEN_KURTIS = [
+  { size:'XS',   bustIn:'32', bustCm:'81',  waistIn:'26', waistCm:'66', hipIn:'34', hipCm:'86',  lenIn:'42' },
+  { size:'S',    bustIn:'34', bustCm:'86',  waistIn:'28', waistCm:'71', hipIn:'36', hipCm:'91',  lenIn:'43' },
+  { size:'M',    bustIn:'36', bustCm:'91',  waistIn:'30', waistCm:'76', hipIn:'38', hipCm:'97',  lenIn:'44' },
+  { size:'L',    bustIn:'38', bustCm:'97',  waistIn:'32', waistCm:'81', hipIn:'40', hipCm:'102', lenIn:'44½'},
+  { size:'XL',   bustIn:'40', bustCm:'102', waistIn:'34', waistCm:'86', hipIn:'42', hipCm:'107', lenIn:'45' },
+  { size:'XXL',  bustIn:'42', bustCm:'107', waistIn:'36', waistCm:'91', hipIn:'44', hipCm:'112', lenIn:'45½'},
+  { size:'XXXL', bustIn:'44', bustCm:'112', waistIn:'38', waistCm:'97', hipIn:'46', hipCm:'117', lenIn:'46' },
+];
+
+const WOMEN_SAREES = [
+  { size:'32', bustIn:'32', bustCm:'81',  waistIn:'26', waistCm:'66', blouseLen:'15',  sareeLen:'5.5 m' },
+  { size:'34', bustIn:'34', bustCm:'86',  waistIn:'28', waistCm:'71', blouseLen:'15',  sareeLen:'5.5 m' },
+  { size:'36', bustIn:'36', bustCm:'91',  waistIn:'30', waistCm:'76', blouseLen:'15½', sareeLen:'5.5 m' },
+  { size:'38', bustIn:'38', bustCm:'97',  waistIn:'32', waistCm:'81', blouseLen:'16',  sareeLen:'5.5 m' },
+  { size:'40', bustIn:'40', bustCm:'102', waistIn:'34', waistCm:'86', blouseLen:'16',  sareeLen:'5.5 m' },
+  { size:'42', bustIn:'42', bustCm:'107', waistIn:'36', waistCm:'91', blouseLen:'16½', sareeLen:'5.5 m' },
+];
+
+const WOMEN_JEANS = [
+  { size:'26', waistIn:'26', waistCm:'66', hipIn:'35', hipCm:'89',  inseamIn:'30',  inseamCm:'76' },
+  { size:'28', waistIn:'28', waistCm:'71', hipIn:'37', hipCm:'94',  inseamIn:'30',  inseamCm:'76' },
+  { size:'30', waistIn:'30', waistCm:'76', hipIn:'39', hipCm:'99',  inseamIn:'30½', inseamCm:'77' },
+  { size:'32', waistIn:'32', waistCm:'81', hipIn:'41', hipCm:'104', inseamIn:'31',  inseamCm:'79' },
+  { size:'34', waistIn:'34', waistCm:'86', hipIn:'43', hipCm:'109', inseamIn:'31',  inseamCm:'79' },
+  { size:'36', waistIn:'36', waistCm:'91', hipIn:'45', hipCm:'114', inseamIn:'31½', inseamCm:'80' },
+];
+
+function SizeTable({ headers, rows, accent = '#7c6aff' }) {
+  const thStyle = {
+    padding: '11px 14px', fontSize: 11, fontWeight: 700,
+    textTransform: 'uppercase', letterSpacing: '1px',
+    background: accent + '18', color: accent,
+    borderBottom: `2px solid ${accent}33`,
+    whiteSpace: 'nowrap', textAlign: 'left',
+  };
+  const tdStyle = (i) => ({
+    padding: '10px 14px', fontSize: 13,
+    borderBottom: '1px solid var(--border-glass)',
+    color: i === 0 ? 'var(--text-primary)' : 'var(--text-secondary)',
+    fontWeight: i === 0 ? 700 : 400,
+    whiteSpace: 'nowrap',
+  });
+  return (
+    <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid var(--border-glass)' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
+        <thead>
+          <tr>{headers.map((h, i) => <th key={i} style={thStyle}>{h}</th>)}</tr>
+        </thead>
+        <tbody>
+          {rows.map((row, ri) => (
+            <tr key={ri} style={{ background: ri % 2 === 0 ? 'var(--bg-glass)' : 'transparent' }}>
+              {row.map((cell, ci) => <td key={ci} style={tdStyle(ci)}>{cell}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SizeSection({ title, accent, children }) {
+  return (
+    <div style={{ marginBottom: 48 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+        <div style={{ width: 4, height: 28, borderRadius: 2, background: accent, flexShrink: 0 }} />
+        <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>{title}</h3>
+      </div>
+      {children}
+    </div>
+  );
+}
 
 export function SizeGuidePage() {
-  return (
-    <InfoPage
-      title="Size Guide"
-      subtitle="Find your perfect fit. Our sizes follow international standards — measure yourself once and shop with confidence."
-      sections={[
-        {
-          heading: 'How to Measure',
-          body: 'Use a soft measuring tape and keep it parallel to the floor. For the most accurate readings, ask a friend to help and measure over light clothing.',
-          list: [
-            'Chest — measure around the fullest part, under the arms.',
-            'Waist — measure around the narrowest part of your natural waist.',
-            'Hips — measure around the widest part, about 20cm below your waist.',
-            'Inseam — measure from the top of the inner thigh down to the ankle.',
-          ],
-        },
-        {
-          heading: 'Men — Tops (cm)',
-          list: [
-            'S — Chest 90–96, Waist 76–82',
-            'M — Chest 97–102, Waist 83–88',
-            'L — Chest 103–108, Waist 89–94',
-            'XL — Chest 109–114, Waist 95–100',
-            'XXL — Chest 115–120, Waist 101–106',
-          ],
-        },
-        {
-          heading: 'Women — Tops (cm)',
-          list: [
-            'XS — Bust 80–84, Waist 60–64, Hips 86–90',
-            'S — Bust 85–89, Waist 65–69, Hips 91–95',
-            'M — Bust 90–94, Waist 70–74, Hips 96–100',
-            'L — Bust 95–99, Waist 75–79, Hips 101–105',
-            'XL — Bust 100–104, Waist 80–84, Hips 106–110',
-          ],
-        },
-        {
-          heading: 'Still Unsure?',
-          body: 'Try our 3D Try-On — upload a photo and see exactly how clothes fit on you before buying. Most customers find their perfect size on the first try.',
-        },
-      ]}
-      cta={{
-        heading: 'Skip the guesswork',
-        body: 'Try clothes on virtually with our AI-powered 3D fitting room.',
-        primaryLabel: 'Open 3D Try-On',
-        primaryTo: '/tryon/live',
-      }}
-    />
-  );
-}
+  const [unit, setUnit] = useState('both'); // 'in' | 'cm' | 'both'
+  const show = (val, type) => unit === 'both' ? val : unit === type ? val : null;
 
-export function ShippingInfoPage() {
-  return (
-    <InfoPage
-      title="Shipping Info"
-      subtitle="Fast, tracked delivery to your doorstep. Free shipping on all orders above ₹999."
-      sections={[
-        {
-          heading: 'Delivery Times',
-          list: [
-            'Metro cities — 1 to 2 business days.',
-            'Tier-1 cities — 2 to 4 business days.',
-            'Other regions — 4 to 7 business days.',
-            'International orders — 7 to 14 business days.',
-          ],
-        },
-        {
-          heading: 'Shipping Charges',
-          list: [
-            'Free standard shipping on orders above ₹999.',
-            'Standard shipping on orders below ₹999 — ₹49.',
-            'Express delivery (24-hour metro) — ₹149.',
-            'International — calculated at checkout based on destination.',
-          ],
-        },
-        {
-          heading: 'Order Processing',
-          body: 'Orders placed before 2:00 PM IST on a business day are processed the same day. Orders placed after 2:00 PM, on weekends, or on holidays are processed the next business day.',
-        },
-        {
-          heading: 'Tracking',
-          body: 'You will receive a tracking link via email and SMS as soon as your order ships. You can also track your order from the Track Order page using your order ID.',
-        },
-      ]}
-      cta={{
-        heading: 'Need to track an order?',
-        body: 'Enter your order ID to see real-time status and delivery updates.',
-        primaryLabel: 'Track Order',
-        primaryTo: '/track-order',
-      }}
-    />
-  );
-}
+  const menHeaders = ['Size',
+    ...(unit !== 'cm' ? ['Chest (in)', 'Waist (in)', 'Sleeve (in)'] : []),
+    ...(unit !== 'in' ? ['Chest (cm)', 'Waist (cm)', 'Sleeve (cm)'] : []),
+  ];
 
-export function ReturnsPage() {
+  const topHeaders = ['Size',
+    ...(unit !== 'cm' ? ['Bust (in)', 'Waist (in)', 'Hip (in)'] : []),
+    ...(unit !== 'in' ? ['Bust (cm)', 'Waist (cm)', 'Hip (cm)'] : []),
+  ];
+
+  const kurti_headers = ['Size',
+    ...(unit !== 'cm' ? ['Bust (in)', 'Waist (in)', 'Hip (in)', 'Length (in)'] : []),
+    ...(unit !== 'in' ? ['Bust (cm)', 'Waist (cm)', 'Hip (cm)'] : []),
+  ];
+
+  const sareeHeaders = ['Blouse Size',
+    ...(unit !== 'cm' ? ['Bust (in)', 'Waist (in)', 'Blouse Len (in)'] : []),
+    ...(unit !== 'in' ? ['Bust (cm)', 'Waist (cm)'] : []),
+    'Saree Length',
+  ];
+
+  const jeansHeaders = ['Waist Size',
+    ...(unit !== 'cm' ? ['Waist (in)', 'Hip (in)', 'Inseam (in)'] : []),
+    ...(unit !== 'in' ? ['Waist (cm)', 'Hip (cm)', 'Inseam (cm)'] : []),
+  ];
+
+  const menRows = MEN_SHIRTS.map(r => [r.size,
+    ...(unit !== 'cm' ? [r.chestIn, r.waistIn, r.sleeveIn] : []),
+    ...(unit !== 'in' ? [r.chestCm, r.waistCm, r.sleeveCm] : []),
+  ]);
+  const topRows = WOMEN_TOPS.map(r => [r.size,
+    ...(unit !== 'cm' ? [r.bustIn, r.waistIn, r.hipIn] : []),
+    ...(unit !== 'in' ? [r.bustCm, r.waistCm, r.hipCm] : []),
+  ]);
+  const kurti_rows = WOMEN_KURTIS.map(r => [r.size,
+    ...(unit !== 'cm' ? [r.bustIn, r.waistIn, r.hipIn, r.lenIn] : []),
+    ...(unit !== 'in' ? [r.bustCm, r.waistCm, r.hipCm] : []),
+  ]);
+  const sareeRows = WOMEN_SAREES.map(r => [r.size,
+    ...(unit !== 'cm' ? [r.bustIn, r.waistIn, r.blouseLen] : []),
+    ...(unit !== 'in' ? [r.bustCm, r.waistCm] : []),
+    r.sareeLen,
+  ]);
+  const jeansRows = WOMEN_JEANS.map(r => [r.size,
+    ...(unit !== 'cm' ? [r.waistIn, r.hipIn, r.inseamIn] : []),
+    ...(unit !== 'in' ? [r.waistCm, r.hipCm, r.inseamCm] : []),
+  ]);
+
+  const btnStyle = (active) => ({
+    padding: '8px 18px', borderRadius: 20, border: 'none', cursor: 'pointer',
+    fontSize: 12, fontWeight: 700,
+    background: active ? 'var(--accent)' : 'var(--bg-glass)',
+    color: active ? 'white' : 'var(--text-secondary)',
+    border: `1px solid ${active ? 'var(--accent)' : 'var(--border-glass)'}`,
+    transition: 'all 0.2s',
+  });
+
   return (
-    <InfoPage
-      title="Returns & Exchanges"
-      subtitle="Easy 30-day returns. If something is not right, we will make it right — no questions asked."
-      sections={[
-        {
-          heading: 'Return Policy',
-          list: [
-            '30-day return window from the date of delivery.',
-            'Items must be unworn, unwashed, and have all original tags attached.',
-            'Original packaging required for fastest refunds.',
-            'Innerwear, swimwear, and final-sale items cannot be returned.',
-          ],
-        },
-        {
-          heading: 'How to Return',
-          list: [
-            'Open the order from your account and tap "Request Return".',
-            'Choose a reason and select pickup or self-ship.',
-            'Pack the item securely with tags intact.',
-            'Hand it to our courier or drop it at the nearest partner location.',
-          ],
-        },
-        {
-          heading: 'Refund Timeline',
-          body: 'Once we receive and inspect your return, refunds are issued within 3 to 5 business days to your original payment method. UPI and wallet refunds are usually instant after approval.',
-        },
-        {
-          heading: 'Exchanges',
-          body: 'Want a different size or colour? Request an exchange instead of a return — we will pick up the original and ship the replacement at no extra cost.',
-        },
-      ]}
-      cta={{
-        heading: 'Need help with a return?',
-        body: 'Our support team responds within 24 hours, every day of the week.',
-        primaryLabel: 'Contact Support',
-        primaryTo: '/contact',
-      }}
-    />
+    <div style={{ paddingTop: 'var(--nav-height)', minHeight: '100vh', background: 'var(--bg-primary)' }}>
+      <div className="container" style={{ padding: '60px 24px 100px' }}>
+
+        {/* Header */}
+        <div style={{ textAlign: 'center', marginBottom: 48 }}>
+          <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '4px', marginBottom: 12 }}>Fit Guide</p>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(32px,5vw,52px)', fontWeight: 800, letterSpacing: '-2px', marginBottom: 14 }}>
+            Size Chart
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 15, maxWidth: 540, margin: '0 auto 28px' }}>
+            Measure yourself once and shop with confidence. All sizes follow Indian standard sizing.
+          </p>
+
+          {/* Unit toggle */}
+          <div style={{ display: 'inline-flex', gap: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)', borderRadius: 30, padding: 4 }}>
+            {[['both','Inches + CM'],['in','Inches only'],['cm','CM only']].map(([val, label]) => (
+              <button key={val} onClick={() => setUnit(val)} style={btnStyle(unit === val)}>{label}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* How to Measure */}
+        <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)', borderRadius: 20, padding: '24px 28px', marginBottom: 48 }}>
+          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 800, marginBottom: 16, color: 'var(--text-primary)' }}>📐 How to Measure</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+            {[
+              ['Chest / Bust', 'Measure around the fullest part, just under the arms.'],
+              ['Waist', 'Measure around the narrowest part of your natural waist.'],
+              ['Hip', 'Measure around the widest part, ~20 cm below your waist.'],
+              ['Sleeve', 'From center back neck, over shoulder, down to wrist.'],
+              ['Inseam', 'From top of inner thigh down to the ankle.'],
+              ['Kurti Length', 'From the highest shoulder point down to the hem.'],
+            ].map(([title, desc]) => (
+              <div key={title} style={{ background: 'var(--bg-glass)', borderRadius: 10, padding: '12px 14px' }}>
+                <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 4 }}>{title}</p>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ══ MEN'S SECTION ══ */}
+        <div style={{ marginBottom: 56 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 32, paddingBottom: 16, borderBottom: '2px solid var(--border-glass)' }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(124,106,255,0.15)', border: '1px solid rgba(124,106,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>👔</div>
+            <div>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 800, margin: 0, color: '#7c6aff' }}>Men's Size Chart</h2>
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>Shirts, T-Shirts & Tops</p>
+            </div>
+          </div>
+
+          <SizeSection title="Shirts & T-Shirts" accent="#7c6aff">
+            <SizeTable headers={menHeaders} rows={menRows} accent="#7c6aff" />
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+              💡 For a relaxed fit, size up. For slim fit shirts, choose your exact chest size.
+            </p>
+          </SizeSection>
+        </div>
+
+        {/* ══ WOMEN'S SECTION ══ */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 32, paddingBottom: 16, borderBottom: '2px solid var(--border-glass)' }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(255,106,154,0.15)', border: '1px solid rgba(255,106,154,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>👗</div>
+            <div>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 800, margin: 0, color: '#ff6a9a' }}>Women's Size Chart</h2>
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: 0 }}>Sarees, Kurtis, Tops & Jeans</p>
+            </div>
+          </div>
+
+          <SizeSection title="Tops & Blouses" accent="#ff6a9a">
+            <SizeTable headers={topHeaders} rows={topRows} accent="#ff6a9a" />
+          </SizeSection>
+
+          <SizeSection title="Kurtis" accent="#fb923c">
+            <SizeTable headers={kurti_headers} rows={kurti_rows} accent="#fb923c" />
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+              💡 Kurti length is measured from shoulder to hem. Standard length is 42–46 inches.
+            </p>
+          </SizeSection>
+
+          <SizeSection title="Sarees (Blouse Sizing)" accent="#a855f7">
+            <SizeTable headers={sareeHeaders} rows={sareeRows} accent="#a855f7" />
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+              💡 Standard saree length is 5.5 metres including blouse piece. Petticoat size matches your waist measurement.
+            </p>
+          </SizeSection>
+
+          <SizeSection title="Jeans & Trousers" accent="#3b82f6">
+            <SizeTable headers={jeansHeaders} rows={jeansRows} accent="#3b82f6" />
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
+              💡 Waist size shown is the US/UK numeric waist. Standard inseam is 30–31½ inches for regular length.
+            </p>
+          </SizeSection>
+        </div>
+
+        {/* CTA */}
+        <div style={{ textAlign: 'center', padding: '40px 24px', background: 'var(--bg-secondary)', border: '1px solid var(--border-glass)', borderRadius: 20 }}>
+          <p style={{ fontSize: 22, fontWeight: 800, fontFamily: 'var(--font-display)', marginBottom: 8 }}>Still not sure of your size?</p>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: 20, fontSize: 14 }}>Try our 3D Try-On — see exactly how any outfit fits on you before buying.</p>
+          <Link to="/tryon/live" style={{ textDecoration: 'none' }}>
+            <button style={{ padding: '13px 32px', borderRadius: 50, background: 'var(--gradient-1)', border: 'none', color: 'white', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-body)' }}>
+              Open 3D Try-On →
+            </button>
+          </Link>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -143,152 +295,11 @@ export function TrackOrderPage() {
       title="Track Your Order"
       subtitle="Enter your order ID and registered email to see live status updates."
       sections={[
-        {
-          heading: 'Where to Find Your Order ID',
-          body: 'Your order ID was sent to you via email and SMS at the time of purchase. It looks like SHN-2026-XXXXXX. You can also find it in the "My Orders" section of your account.',
-        },
-        {
-          heading: 'Status Stages',
-          list: [
-            'Confirmed — payment received, preparing your order.',
-            'Packed — your items are packed and ready for pickup.',
-            'Shipped — handed to courier with a live tracking link.',
-            'Out for Delivery — arriving today.',
-            'Delivered — enjoy your order. Try it on and tell us how it fits.',
-          ],
-        },
-        {
-          heading: 'Delayed Order?',
-          body: 'Most delays are caused by incorrect addresses or courier rerouting. If your order has not moved in 48 hours, contact our support team and we will sort it out fast.',
-        },
+        { heading: 'Where to Find Your Order ID', body: 'Your order ID was sent to you via email and SMS at the time of purchase. It looks like SHN-2026-XXXXXX. You can also find it in the "My Orders" section of your account.' },
+        { heading: 'Status Stages', list: ['Confirmed — payment received, preparing your order.', 'Packed — your items are packed and ready for pickup.', 'Shipped — handed to courier with a live tracking link.', 'Out for Delivery — arriving today.', 'Delivered — enjoy your order.'] },
+        { heading: 'Delayed Order?', body: 'Most delays are caused by incorrect addresses or courier rerouting. If your order has not moved in 48 hours, contact our support team and we will sort it out fast.' },
       ]}
-      cta={{
-        heading: 'Have an issue with your order?',
-        body: 'Reach out and we will help you within 24 hours.',
-        primaryLabel: 'Contact Us',
-        primaryTo: '/contact',
-      }}
-    />
-  );
-}
-
-export function ContactPage() {
-  return (
-    <InfoPage
-      title="Contact Us"
-      subtitle="We are here to help. Choose the channel that works best for you — we reply fast."
-      sections={[
-        {
-          heading: 'Customer Support',
-          list: [
-            'Email — support@shopnow.example',
-            'Phone — +91 80000 00000 (Mon to Sat, 9 AM to 9 PM IST)',
-            'Live Chat — tap the chat bubble at the bottom of any page.',
-            'WhatsApp — +91 80000 00000',
-          ],
-        },
-        {
-          heading: 'Press & Media',
-          body: 'For press enquiries, partnerships, or interview requests, write to press@shopnow.example with a brief about your story.',
-        },
-        {
-          heading: 'Careers',
-          body: 'Want to build the future of fashion with us? Email your CV to careers@shopnow.example or visit our Careers page for open roles.',
-        },
-        {
-          heading: 'Office',
-          body: 'ShopNow Technologies Pvt Ltd — 4th Floor, Innovation Hub, HSR Layout, Bengaluru, Karnataka 560102, India.',
-        },
-      ]}
-      cta={{
-        heading: 'Looking for something specific?',
-        body: 'Browse our help articles or jump straight into shopping.',
-        primaryLabel: 'Shop Now',
-        primaryTo: '/men',
-      }}
-    />
-  );
-}
-
-export function AboutPage() {
-  return (
-    <InfoPage
-      title="About ShopNow"
-      subtitle="We are reimagining how the world shops for fashion — by letting you try anything on, virtually, before you buy."
-      sections={[
-        {
-          heading: 'Our Mission',
-          body: 'Online shopping has a fit problem. Up to 40% of fashion returns happen because of sizing. We are fixing that with AI and 3D — so you only ever order what truly suits you.',
-        },
-        {
-          heading: 'Our Story',
-          body: 'ShopNow was founded in 2024 by a small team of engineers, designers, and fashion enthusiasts in Bengaluru. What began as a research project on virtual garments has grown into a platform serving customers across India.',
-        },
-        {
-          heading: 'What Makes Us Different',
-          list: [
-            'Photoreal 3D try-on powered by advanced diffusion models.',
-            'Curated collections — we only stock what we would wear ourselves.',
-            'Sustainable packaging on every single order.',
-            'A no-questions-asked 30-day return promise.',
-          ],
-        },
-        {
-          heading: 'The Numbers',
-          list: [
-            '50,000+ happy customers across India.',
-            '120+ partner brands.',
-            '94% customer satisfaction score.',
-            '< 8% return rate, well below the industry average.',
-          ],
-        },
-      ]}
-      cta={{
-        heading: 'See it for yourself',
-        body: 'Try on the latest drop in 3D — no signup needed.',
-        primaryLabel: 'Try-On Now',
-        primaryTo: '/tryon/live',
-      }}
-    />
-  );
-}
-
-export function CareersPage() {
-  return (
-    <InfoPage
-      title="Careers"
-      subtitle="Help us build the future of fashion. Remote-friendly, ambitious, and humble."
-      sections={[
-        {
-          heading: 'Why ShopNow',
-          list: [
-            'Work on hard, original problems in 3D, AI, and commerce.',
-            'Small team, high autonomy — your work ships to real users every week.',
-            'Competitive compensation, meaningful equity, and a learning budget.',
-            'Remote-first across India with quarterly team offsites.',
-          ],
-        },
-        {
-          heading: 'Open Roles',
-          list: [
-            'Senior Frontend Engineer — React, WebGL, Three.js (Remote).',
-            'ML Engineer — diffusion models, garment synthesis (Bengaluru / Remote).',
-            'Product Designer — visual systems, motion (Remote).',
-            'Customer Experience Lead (Bengaluru).',
-            'Growth Marketing Manager (Bengaluru / Remote).',
-          ],
-        },
-        {
-          heading: 'How to Apply',
-          body: 'Send your CV, portfolio, and a short note about why you want to join to careers@shopnow.example. We read every application and reply within a week.',
-        },
-      ]}
-      cta={{
-        heading: 'Do not see your role?',
-        body: 'We are always open to talking with exceptional people. Drop us a line.',
-        primaryLabel: 'Get in Touch',
-        primaryTo: '/contact',
-      }}
+      cta={{ heading: 'Have an issue with your order?', body: 'Reach out and we will help you within 24 hours.', primaryLabel: 'Contact Us', primaryTo: '/contact' }}
     />
   );
 }
@@ -299,122 +310,11 @@ export function PressPage() {
       title="Press"
       subtitle="News, brand assets, and media enquiries. For coverage, get in touch with our press team."
       sections={[
-        {
-          heading: 'In the News',
-          list: [
-            '"How ShopNow is rebuilding fashion shopping with AI" — TechCrunch India, March 2026.',
-            '"The startup that ended the fitting-room nightmare" — YourStory, January 2026.',
-            '"The 30 most innovative fashion startups of 2025" — Vogue Business, December 2025.',
-          ],
-        },
-        {
-          heading: 'Press Kit',
-          body: 'Download our brand assets — logos, founder photos, product screenshots, and one-pager — from press.shopnow.example/kit.',
-        },
-        {
-          heading: 'Media Enquiries',
-          body: 'For interviews, quotes, or expert commentary on fashion, AI, or e-commerce trends, write to press@shopnow.example. We typically respond within one business day.',
-        },
+        { heading: 'In the News', list: ['"How ShopNow is rebuilding fashion shopping with AI" — TechCrunch India, March 2026.', '"The startup that ended the fitting-room nightmare" — YourStory, January 2026.', '"The 30 most innovative fashion startups of 2025" — Vogue Business, December 2025.'] },
+        { heading: 'Press Kit', body: 'Download our brand assets — logos, founder photos, product screenshots, and one-pager — from press.shopnow.example/kit.' },
+        { heading: 'Media Enquiries', body: 'For interviews, quotes, or expert commentary on fashion, AI, or e-commerce trends, write to press@shopnow.example.' },
       ]}
-      cta={{
-        heading: 'Want to feature us?',
-        body: 'Drop us a line — we love working with thoughtful storytellers.',
-        primaryLabel: 'Contact Press',
-        primaryTo: '/contact',
-      }}
-    />
-  );
-}
-
-export function PrivacyPage() {
-  return (
-    <InfoPage
-      title="Privacy Policy"
-      subtitle="Last updated: January 2026. We take your privacy seriously and only collect what we need to serve you better."
-      sections={[
-        {
-          heading: 'What We Collect',
-          list: [
-            'Account data — name, email, phone, and shipping address.',
-            'Order data — what you bought, when, and where it was shipped.',
-            'Try-on photos — processed on-device whenever possible, never sold.',
-            'Usage analytics — pages visited and features used, in aggregate.',
-          ],
-        },
-        {
-          heading: 'How We Use It',
-          body: 'We use your data to fulfil orders, personalise recommendations, improve the product, and send you updates you have explicitly opted into. We never sell your data to third parties.',
-        },
-        {
-          heading: 'Your Rights',
-          list: [
-            'Access — request a copy of all the data we hold about you.',
-            'Correction — fix any inaccurate data on file.',
-            'Deletion — close your account and erase all personal data.',
-            'Portability — export your data in a machine-readable format.',
-          ],
-        },
-        {
-          heading: 'Cookies',
-          body: 'We use essential cookies to keep you signed in and remember your cart, plus analytics cookies to understand usage. You can manage cookie preferences from your account settings.',
-        },
-        {
-          heading: 'Contact',
-          body: 'For any privacy-related question or to exercise your rights, write to privacy@shopnow.example.',
-        },
-      ]}
-      cta={{
-        heading: 'Questions about your data?',
-        body: 'Our privacy team replies within 5 business days.',
-        primaryLabel: 'Contact Us',
-        primaryTo: '/contact',
-      }}
-    />
-  );
-}
-
-export function TermsPage() {
-  return (
-    <InfoPage
-      title="Terms of Service"
-      subtitle="Last updated: January 2026. By using ShopNow you agree to the following terms."
-      sections={[
-        {
-          heading: 'Using ShopNow',
-          body: 'You must be 18 or older, or have the consent of a parent or guardian, to make a purchase. You are responsible for keeping your account credentials secure.',
-        },
-        {
-          heading: 'Orders and Payment',
-          list: [
-            'All prices are in Indian Rupees (₹) and inclusive of GST unless stated otherwise.',
-            'We reserve the right to cancel orders flagged for fraud or pricing errors.',
-            'Promotional discounts cannot be combined unless explicitly stated.',
-            'Payment is processed by trusted gateways — we do not store full card details.',
-          ],
-        },
-        {
-          heading: 'Try-On Content',
-          body: 'You retain ownership of any photos you upload for the 3D try-on. By uploading, you grant us a limited licence to process the image for the sole purpose of generating your try-on result.',
-        },
-        {
-          heading: 'Intellectual Property',
-          body: 'All site content — including text, images, logos, and software — is the property of ShopNow or its licensors and protected by copyright laws.',
-        },
-        {
-          heading: 'Limitation of Liability',
-          body: 'ShopNow is not liable for indirect or consequential losses arising from the use of the platform. Our total liability is limited to the value of the relevant order.',
-        },
-        {
-          heading: 'Governing Law',
-          body: 'These terms are governed by the laws of India. Any disputes will be subject to the exclusive jurisdiction of the courts of Bengaluru, Karnataka.',
-        },
-      ]}
-      cta={{
-        heading: 'Need clarification?',
-        body: 'Our legal team is happy to answer questions about these terms.',
-        primaryLabel: 'Contact Us',
-        primaryTo: '/contact',
-      }}
+      cta={{ heading: 'Want to feature us?', body: 'Drop us a line — we love working with thoughtful storytellers.', primaryLabel: 'Contact Press', primaryTo: '/contact' }}
     />
   );
 }
@@ -425,21 +325,10 @@ export function NewArrivalsPage() {
       title="New Arrivals"
       subtitle="Just dropped — the latest pieces from our newest collections. Refreshed weekly."
       sections={[
-        {
-          heading: 'This Week',
-          body: 'Our newest drops blend modern silhouettes with everyday comfort. Each piece is curated by our in-house stylists and available in limited quantities — once they sell out, they are gone.',
-        },
-        {
-          heading: 'Restocks',
-          body: 'Customer favourites are back in stock. If you missed out last time, check now — popular sizes go fast.',
-        },
+        { heading: 'This Week', body: 'Our newest drops blend modern silhouettes with everyday comfort. Each piece is curated by our in-house stylists and available in limited quantities — once they sell out, they are gone.' },
+        { heading: 'Restocks', body: 'Customer favourites are back in stock. If you missed out last time, check now — popular sizes go fast.' },
       ]}
-      cta={{
-        heading: 'Browse the latest',
-        body: 'Jump straight into the freshest pieces — try them on in 3D before checkout.',
-        primaryLabel: 'Shop Men',
-        primaryTo: '/men',
-      }}
+      cta={{ heading: 'Browse the latest', body: 'Jump straight into the freshest pieces — try them on in 3D before checkout.', primaryLabel: 'Shop Men', primaryTo: '/men' }}
     />
   );
 }
@@ -450,26 +339,10 @@ export function SalePage() {
       title="Sale"
       subtitle="Up to 60% off on selected styles. While stocks last — popular sizes sell out fast."
       sections={[
-        {
-          heading: 'How the Sale Works',
-          list: [
-            'Discounts are applied automatically at checkout.',
-            'Sale items can be returned within 15 days (instead of the usual 30).',
-            'Cannot be combined with other discount codes.',
-            'Free shipping still applies on orders above ₹999.',
-          ],
-        },
-        {
-          heading: 'Tip',
-          body: 'Use the 3D try-on before checkout — sale items move fast and you do not want to wait for a return.',
-        },
+        { heading: 'How the Sale Works', list: ['Discounts are applied automatically at checkout.', 'Sale items can be returned within 15 days (instead of the usual 30).', 'Cannot be combined with other discount codes.', 'Free shipping still applies on orders above ₹999.'] },
+        { heading: 'Tip', body: 'Use the 3D try-on before checkout — sale items move fast and you do not want to wait for a return.' },
       ]}
-      cta={{
-        heading: 'Shop the sale',
-        body: 'Limited quantities — your size may already be running low.',
-        primaryLabel: 'Shop Women',
-        primaryTo: '/women',
-      }}
+      cta={{ heading: 'Shop the sale', body: 'Limited quantities — your size may already be running low.', primaryLabel: 'Shop Women', primaryTo: '/women' }}
     />
   );
 }

@@ -512,7 +512,7 @@ export default function TryOnPage() {
                     borderRadius: 16, padding: '16px 20px',
                     marginBottom: 28,
                   }}>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 10 }}>Photo Tips for Best Results</p>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 10 }}>📸 Photo Tips for Best Results</p>
                     {['Stand in front of a plain background', 'Wear form-fitting clothes for accuracy', 'Good natural lighting recommended', 'Keep a neutral pose, feet together'].map((tip, i) => (
                       <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 6 }}>
                         <span style={{ color: '#00c864', fontSize: 14, flexShrink: 0 }}>✓</span>

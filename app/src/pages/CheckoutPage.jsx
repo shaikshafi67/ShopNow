@@ -27,11 +27,17 @@ export default function CheckoutPage() {
   const [couponError, setCouponError] = useState('');
 
   const couponDiscount = appliedCoupon?.amount || 0;
-  const finalTotals = useMemo(() => ({
-    ...totals,
-    couponDiscount,
-    total: Math.max(0, totals.total - couponDiscount),
-  }), [totals, couponDiscount]);
+  const isFreeShipping = appliedCoupon?.freeShipping || false;
+  const finalTotals = useMemo(() => {
+    const shippingOverride = isFreeShipping ? 0 : totals.shipping;
+    const shippingSavings = isFreeShipping ? totals.shipping : 0;
+    return {
+      ...totals,
+      shipping: shippingOverride,
+      couponDiscount: couponDiscount + shippingSavings,
+      total: Math.max(0, totals.subtotal + shippingOverride + totals.tax - couponDiscount),
+    };
+  }, [totals, couponDiscount, isFreeShipping]);
 
   const handleApplyCoupon = () => {
     if (!couponInput.trim()) return;
@@ -406,6 +412,13 @@ export default function CheckoutPage() {
 
             <p style={{ marginTop: 12, color: 'var(--text-secondary)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
               <Truck size={14} color="var(--accent)" /> Delivery by {shortDate(addDays(new Date(), 5))}
+            </p>
+
+            <p style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+              By placing the order, you agree to ShopNow's{' '}
+              <a href="/terms" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>Terms of Use</a>
+              {' '}and{' '}
+              <a href="/privacy" style={{ color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>Privacy Policy</a>
             </p>
           </aside>
         </div>

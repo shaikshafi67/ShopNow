@@ -50,6 +50,8 @@ export default function HeroBanner() {
         position: 'relative',
         width: '100%',
         height: 'calc(100vh - var(--nav-height, 64px))',
+        maxHeight: '860px',
+        minHeight: '400px',
         overflow: 'hidden',
         background: 'var(--bg-secondary)',
       }}

@@ -43,3 +43,4 @@ To enable real payments, copy `app/.env.example` to `app/.env` and add your keys
 RAZORPAY_KEY_ID=rzp_test_YOUR_KEY
 RAZORPAY_KEY_SECRET=YOUR_SECRET
 ```
+

@@ -108,9 +108,12 @@ export function DiscountsProvider({ children }) {
       return { valid: false, error: 'This discount is not active yet.' };
 
     let amount = 0;
-    if (disc.type === 'amount_off_order' || disc.type === 'amount_off_product') {
+    if (disc.type === 'free_shipping') {
+      return { valid: true, discount: disc, amount: 0, freeShipping: true };
+    }
+    if (disc.valueType === 'fixed' || disc.type === 'amount_off_order' || disc.type === 'amount_off_product') {
       amount = Math.min(disc.value, cartTotal);
-    } else if (disc.type === 'percentage_off_order') {
+    } else if (disc.valueType === 'percentage' || disc.type === 'percentage_off_order' || disc.type === 'amount_off_products') {
       amount = Math.round((cartTotal * disc.value) / 100);
     }
 

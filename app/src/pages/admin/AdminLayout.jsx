@@ -1,15 +1,18 @@
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Package, Layers, ShoppingCart, Users, BarChart2, LogOut, Sparkles, ChevronRight, Image, Tag } from 'lucide-react';
+import { LayoutDashboard, Package, Layers, ShoppingCart, Users, BarChart2, LogOut, Sparkles, ChevronRight, Image, Tag, FileText, PlusCircle, Upload, Download, Palette, Megaphone, Flame, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { useTheme } from '../../context/ThemeContext';
 
 const LINKS = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
   {
     label: 'Products', icon: Package, group: true,
     children: [
-      { to: '/admin/products', label: 'All products' },
-      { to: '/admin/collections', label: 'Collections' },
+      { to: '/admin/products',     label: 'All Products' },
+      { to: '/admin/products/add', label: '+ Add Product', highlight: true },
+      { to: '/admin/products/csv', label: '↑↓ Import / Export' },
+      { to: '/admin/collections',  label: 'Collections' },
     ],
   },
   { to: '/admin/orders', label: 'Orders', icon: ShoppingCart },
@@ -17,12 +20,17 @@ const LINKS = [
   { to: '/admin/users', label: 'Users', icon: Users },
   { to: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
   { to: '/admin/banners', label: 'Banners', icon: Image },
+  { to: '/admin/branding', label: 'Branding', icon: Palette },
+  { to: '/admin/announcements', label: 'Announcements', icon: Megaphone },
+  { to: '/admin/promo', label: 'Promo Banners', icon: Flame },
+  { to: '/admin/pages', label: 'Pages', icon: FileText },
 ];
 
 export default function AdminLayout() {
   const { logout } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
+  const { toggle, isDark } = useTheme();
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', paddingTop: 'var(--nav-height)', background: 'var(--bg-primary)' }}>
@@ -36,10 +44,19 @@ export default function AdminLayout() {
         display: 'flex', flexDirection: 'column',
         overflowY: 'auto',
       }}>
-        <div style={{ padding: '20px 16px', borderBottom: '1px solid var(--border-glass)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-            <Sparkles size={16} color="var(--accent)" />
-            <span style={{ fontWeight: 800, fontSize: 15, fontFamily: 'var(--font-display)' }}>Admin Panel</span>
+        <div style={{ padding: '16px 16px', borderBottom: '1px solid var(--border-glass)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Sparkles size={16} color="var(--accent)" />
+              <span style={{ fontWeight: 800, fontSize: 15, fontFamily: 'var(--font-display)' }}>Admin Panel</span>
+            </div>
+            <button
+              onClick={toggle}
+              title={isDark ? 'Switch to Light mode' : 'Switch to Dark mode'}
+              style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid var(--border-glass)', background: 'var(--bg-glass)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}
+            >
+              {isDark ? <Sun size={14} /> : <Moon size={14} />}
+            </button>
           </div>
           <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>ShopNow management</span>
         </div>
@@ -53,14 +70,15 @@ export default function AdminLayout() {
                     <link.icon size={17} /> {link.label}
                   </div>
                   {link.children.map((child) => (
-                    <NavLink key={child.to} to={child.to}
+                    <NavLink key={child.to} to={child.to} end={child.to === '/admin/products'}
                       style={({ isActive }) => ({
                         display: 'flex', alignItems: 'center', gap: 10,
-                        padding: '8px 12px 8px 36px', borderRadius: 10, marginBottom: 2,
-                        textDecoration: 'none', fontSize: 13, fontWeight: isActive ? 700 : 500,
-                        color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
-                        background: isActive ? 'rgba(124,106,255,0.1)' : 'transparent',
+                        padding: '7px 12px 7px 36px', borderRadius: 10, marginBottom: 2,
+                        textDecoration: 'none', fontSize: 12, fontWeight: isActive ? 700 : 500,
+                        color: isActive ? 'var(--accent)' : child.highlight ? 'var(--accent)' : 'var(--text-secondary)',
+                        background: isActive ? 'rgba(124,106,255,0.12)' : child.highlight ? 'rgba(124,106,255,0.05)' : 'transparent',
                         transition: 'all var(--transition)',
+                        opacity: isActive ? 1 : 0.85,
                       })}
                     >{child.label}</NavLink>
                   ))}

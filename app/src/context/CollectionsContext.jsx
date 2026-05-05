@@ -10,16 +10,13 @@ export function useCollections() {
   return ctx;
 }
 
-function persist(data) {
-  set('collections_data', data).catch((err) => console.error('Failed to save collections', err));
-}
-
 export function CollectionsProvider({ children }) {
   const [autoImages, setAutoImages] = useState({});
-  const [autoExclusions, setAutoExclusions] = useState({}); // { [category]: [productId, ...] }
-  const [hiddenAutoIds, setHiddenAutoIds] = useState([]); // categories hidden from list
+  const [autoExclusions, setAutoExclusions] = useState({});
+  const [hiddenAutoIds, setHiddenAutoIds] = useState([]);
   const [customCollections, setCustomCollections] = useState([]);
   const ready = useRef(false);
+  const shouldBroadcast = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -27,82 +24,110 @@ export function CollectionsProvider({ children }) {
       try {
         const stored = await get('collections_data');
         if (!cancelled && stored) {
-          if (stored.autoImages) setAutoImages(stored.autoImages);
-          if (stored.autoExclusions) setAutoExclusions(stored.autoExclusions);
-          if (stored.hiddenAutoIds) setHiddenAutoIds(stored.hiddenAutoIds);
-          if (stored.customCollections) setCustomCollections(stored.customCollections);
+          if (stored.autoImages !== undefined) setAutoImages(stored.autoImages);
+          if (stored.autoExclusions !== undefined) setAutoExclusions(stored.autoExclusions);
+          if (stored.hiddenAutoIds !== undefined) setHiddenAutoIds(stored.hiddenAutoIds);
+          if (stored.customCollections !== undefined) setCustomCollections(stored.customCollections);
         }
       } finally {
         if (!cancelled) ready.current = true;
       }
     }
     init();
-    return () => { cancelled = true; };
+
+    let bc;
+    try {
+      bc = new BroadcastChannel('shopnow-collections');
+      bc.onmessage = (e) => {
+        if (e.data?.type === 'collectionsUpdate' && e.data.data) {
+          const d = e.data.data;
+          // Update state from another tab — do NOT re-broadcast
+          shouldBroadcast.current = false;
+          if (d.autoImages !== undefined) setAutoImages(d.autoImages);
+          if (d.autoExclusions !== undefined) setAutoExclusions(d.autoExclusions);
+          if (d.hiddenAutoIds !== undefined) setHiddenAutoIds(d.hiddenAutoIds);
+          if (d.customCollections !== undefined) setCustomCollections(d.customCollections);
+        }
+      };
+    } catch {}
+
+    const onFocus = () => {
+      get('collections_data').then(stored => {
+        if (!stored) return;
+        shouldBroadcast.current = false;
+        if (stored.autoImages !== undefined) setAutoImages(stored.autoImages);
+        if (stored.autoExclusions !== undefined) setAutoExclusions(stored.autoExclusions);
+        if (stored.hiddenAutoIds !== undefined) setHiddenAutoIds(stored.hiddenAutoIds);
+        if (stored.customCollections !== undefined) setCustomCollections(stored.customCollections);
+      }).catch(() => {});
+    };
+    window.addEventListener('focus', onFocus);
+
+    return () => { cancelled = true; bc?.close(); window.removeEventListener('focus', onFocus); };
   }, []);
 
-  function save(ai, ae, ha, cc) {
-    persist({ autoImages: ai, autoExclusions: ae, hiddenAutoIds: ha, customCollections: cc });
-  }
-
-  const s = (ai, ae, ha, cc) => save(ai, ae, ha, cc);
+  // Save to IDB and optionally broadcast whenever any collection state changes
+  useEffect(() => {
+    if (!ready.current) return;
+    const data = { autoImages, autoExclusions, hiddenAutoIds, customCollections };
+    set('collections_data', data).catch(err => console.error('Failed to save collections', err));
+    if (shouldBroadcast.current) {
+      try {
+        const bc = new BroadcastChannel('shopnow-collections');
+        bc.postMessage({ type: 'collectionsUpdate', data });
+        bc.close();
+      } catch {}
+      shouldBroadcast.current = false;
+    }
+  }, [autoImages, autoExclusions, hiddenAutoIds, customCollections]);
 
   const setAutoImage = useCallback((category, imageUrl) => {
+    shouldBroadcast.current = true;
     setAutoImages((ai) => {
       const next = { ...ai };
       if (imageUrl === null) delete next[category]; else next[category] = imageUrl;
-      setAutoExclusions((ae) => { setHiddenAutoIds((ha) => { setCustomCollections((cc) => { s(next, ae, ha, cc); return cc; }); return ha; }); return ae; });
       return next;
     });
   }, []);
 
   const setAutoExclusion = useCallback((category, excludedIds) => {
-    setAutoExclusions((ae) => {
-      const next = { ...ae, [category]: excludedIds };
-      setAutoImages((ai) => { setHiddenAutoIds((ha) => { setCustomCollections((cc) => { s(ai, next, ha, cc); return cc; }); return ha; }); return ai; });
-      return next;
-    });
+    shouldBroadcast.current = true;
+    setAutoExclusions((ae) => ({ ...ae, [category]: excludedIds }));
   }, []);
 
   const hideAutoCollections = useCallback((categories) => {
-    setHiddenAutoIds((ha) => {
-      const next = [...new Set([...ha, ...categories])];
-      setAutoImages((ai) => { setAutoExclusions((ae) => { setCustomCollections((cc) => { s(ai, ae, next, cc); return cc; }); return ae; }); return ai; });
-      return next;
-    });
+    shouldBroadcast.current = true;
+    setHiddenAutoIds((ha) => [...new Set([...ha, ...categories])]);
+  }, []);
+
+  const showAutoCollections = useCallback((categories) => {
+    shouldBroadcast.current = true;
+    setHiddenAutoIds((ha) => ha.filter(c => !categories.includes(c)));
   }, []);
 
   const addCustom = useCallback((col) => {
     const newCol = { ...col, id: uid('col') };
-    setCustomCollections((cc) => {
-      const next = [...cc, newCol];
-      setAutoImages((ai) => { setAutoExclusions((ae) => { setHiddenAutoIds((ha) => { s(ai, ae, ha, next); return ha; }); return ae; }); return ai; });
-      return next;
-    });
+    shouldBroadcast.current = true;
+    setCustomCollections((cc) => [...cc, newCol]);
     return newCol;
   }, []);
 
   const updateCustom = useCallback((id, patch) => {
-    setCustomCollections((cc) => {
-      const next = cc.map((c) => c.id === id ? { ...c, ...patch } : c);
-      setAutoImages((ai) => { setAutoExclusions((ae) => { setHiddenAutoIds((ha) => { s(ai, ae, ha, next); return ha; }); return ae; }); return ai; });
-      return next;
-    });
+    shouldBroadcast.current = true;
+    setCustomCollections((cc) => cc.map((c) => c.id === id ? { ...c, ...patch } : c));
   }, []);
 
   const removeCustom = useCallback((ids) => {
     const idSet = new Set(Array.isArray(ids) ? ids : [ids]);
-    setCustomCollections((cc) => {
-      const next = cc.filter((c) => !idSet.has(c.id));
-      setAutoImages((ai) => { setAutoExclusions((ae) => { setHiddenAutoIds((ha) => { s(ai, ae, ha, next); return ha; }); return ae; }); return ai; });
-      return next;
-    });
+    shouldBroadcast.current = true;
+    setCustomCollections((cc) => cc.filter((c) => !idSet.has(c.id)));
   }, []);
 
   return (
     <CollectionsContext.Provider value={{
       autoImages, setAutoImage,
       autoExclusions, setAutoExclusion,
-      hiddenAutoIds, hideAutoCollections,
+      hiddenAutoIds, hideAutoCollections, showAutoCollections,
       customCollections, addCustom, updateCustom, removeCustom,
     }}>
       {children}

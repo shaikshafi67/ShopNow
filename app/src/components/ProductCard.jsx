@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Heart, ShoppingBag, Sparkles, Star } from 'lucide-react';
+import { Heart, ShoppingBag, Sparkles } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
@@ -195,22 +195,6 @@ export default function ProductCard({ product, index = 0 }) {
           )}
         </div>
 
-        {/* Rating — Myntra-style pill */}
-        {product.rating && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
-            <div style={{
-              background: '#14958f', color: 'white', borderRadius: 2, padding: '1px 5px',
-              fontSize: 11, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 2,
-            }}>
-              {product.rating} <Star size={9} fill="white" />
-            </div>
-            {product.reviews > 0 && (
-              <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
-                | {product.reviews >= 1000 ? `${(product.reviews / 1000).toFixed(1)}k` : product.reviews}
-              </span>
-            )}
-          </div>
-        )}
 
         {/* Stock warning */}
         {(product.stock !== undefined && product.stock <= 5 && product.stock > 0) && (
