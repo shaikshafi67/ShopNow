@@ -18,7 +18,8 @@ import { inr } from '../utils/format';
  *    - No real charges
  */
 
-const API_BASE = 'http://localhost:3001';
+// In dev the payment server runs separately on 3001; in production it's the same origin
+const API_BASE = import.meta.env.DEV ? 'http://localhost:3001' : '';
 
 // ── Check if real Razorpay backend is available ──────────────────────────
 async function checkBackend() {
@@ -142,6 +143,7 @@ export default function RazorpayModal({ open, amount, user, onSuccess, onClose }
   const [cardExp, setCardExp] = useState('');
   const [cardCvv, setCardCvv] = useState('');
   const [bank, setBank] = useState('');
+  const [wallet, setWallet] = useState('');
   const [error, setError] = useState('');
 
   // Check backend availability on open
@@ -201,6 +203,7 @@ export default function RazorpayModal({ open, amount, user, onSuccess, onClose }
       if (!cardExp || !cardCvv) { setError('Fill all card details'); return false; }
     }
     if (method === 'netbanking' && !bank) { setError('Select a bank'); return false; }
+    if (method === 'wallet' && !wallet) { setError('Select a wallet to continue'); return false; }
     return true;
   };
 
@@ -342,7 +345,7 @@ export default function RazorpayModal({ open, amount, user, onSuccess, onClose }
                       return (
                         <button
                           key={m.id}
-                          onClick={() => { setMethod(m.id); setError(''); }}
+                          onClick={() => { setMethod(m.id); setWallet(''); setError(''); }}
                           style={{
                             width: '100%', padding: '12px 14px',
                             background: active ? '#fff' : 'transparent',
@@ -406,11 +409,21 @@ export default function RazorpayModal({ open, amount, user, onSuccess, onClose }
 
                     {method === 'wallet' && (
                       <div>
-                        <h3 style={formTitle}>Wallet Payment</h3>
-                        <p style={{ color: '#666', fontSize: 14, lineHeight: 1.6 }}>You'll be redirected to your wallet app to pay {inr(amount)}.</p>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 16 }}>
+                        <h3 style={formTitle}>Select Wallet</h3>
+                        <p style={{ color: '#666', fontSize: 13, lineHeight: 1.6, marginBottom: 14 }}>Choose a wallet to pay {inr(amount)}.</p>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                           {['Paytm', 'PhonePe', 'MobiKwik', 'FreeCharge'].map((w) => (
-                            <button key={w} style={{ padding: '12px', borderRadius: 8, background: '#f7f8fa', border: '1px solid #eee', cursor: 'pointer', fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-body)' }}>{w}</button>
+                            <button
+                              key={w}
+                              onClick={() => { setWallet(w); setError(''); }}
+                              style={{
+                                padding: '12px', borderRadius: 8, cursor: 'pointer',
+                                fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-body)',
+                                background: wallet === w ? '#EEF0FF' : '#f7f8fa',
+                                border: `1px solid ${wallet === w ? '#2B3A67' : '#eee'}`,
+                                color: wallet === w ? '#2B3A67' : '#444',
+                              }}
+                            >{w}</button>
                           ))}
                         </div>
                       </div>

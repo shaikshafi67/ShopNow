@@ -16,7 +16,7 @@ export default function CheckoutPage() {
   const { items, totals, clear } = useCart();
   const { user, addAddress } = useAuth();
   const { placeOrder } = useOrders();
-  const { decrementStock } = useCatalog();
+  const { decrementStock, products } = useCatalog();
   const toast = useToast();
   const notif = useNotifications();
   const { applyCode, incrementUsed } = useDiscounts();
@@ -27,7 +27,20 @@ export default function CheckoutPage() {
   const [couponError, setCouponError] = useState('');
 
   const couponDiscount = appliedCoupon?.amount || 0;
-  const isFreeShipping = appliedCoupon?.freeShipping || false;
+  const isCouponFreeShipping = appliedCoupon?.freeShipping || false;
+
+  // Free shipping if every item in cart has freeShipping set — check stored flag
+  // first (new items), then fall back to the live catalog (existing cart items)
+  const isProductFreeShipping = useMemo(() =>
+    items.length > 0 && items.every((it) => {
+      if (it.freeShipping === true) return true;
+      const product = products.find((p) => p.id === it.productId);
+      return product?.freeShipping === true;
+    }),
+  [items, products]);
+
+  const isFreeShipping = isCouponFreeShipping || isProductFreeShipping;
+
   const finalTotals = useMemo(() => {
     const shippingOverride = isFreeShipping ? 0 : totals.shipping;
     const shippingSavings = isFreeShipping ? totals.shipping : 0;

@@ -39,6 +39,7 @@ export function CartProvider({ children }) {
         size,
         color,
         colorHex: product.colors?.[color] || null,
+        freeShipping: product.freeShipping === true,
         qty,
         addedAt: new Date().toISOString(),
       }];
@@ -62,7 +63,8 @@ export function CartProvider({ children }) {
     const subtotal = items.reduce((s, it) => s + it.price * it.qty, 0);
     const original = items.reduce((s, it) => s + (it.originalPrice || it.price) * it.qty, 0);
     const savings = original - subtotal;
-    const shipping = subtotal === 0 ? 0 : subtotal >= 999 ? 0 : 49;
+    const allFreeShipping = items.length > 0 && items.every((it) => it.freeShipping);
+    const shipping = subtotal === 0 ? 0 : allFreeShipping || subtotal >= 999 ? 0 : 49;
     const tax = Math.round(subtotal * 0.05);
     const total = subtotal + shipping + tax;
     const count = items.reduce((s, it) => s + it.qty, 0);

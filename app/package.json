@@ -4,15 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "npx kill-port 5173 --silent 2>nul & vite",
+    "dev": "concurrently --kill-others-on-fail \"vite\" \"node ../server/src/index.js\" --names \"app,pay\" --prefix-colors \"cyan,green\"",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "server": "node server/index.js",
-    "dev:full": "node server/index.js & vite"
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
@@ -44,15 +42,16 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.1",
-    "@vitest/coverage-v8": "^4.1.5",
+    "@vitejs/plugin-react": "^4.7.0",
+    "@vitest/coverage-v8": "^2.1.9",
+    "concurrently": "^9.2.1",
     "eslint": "^9.39.4",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.4.0",
     "jsdom": "^29.0.2",
     "kill-port": "^2.0.1",
-    "vite": "^8.0.4",
-    "vitest": "^4.1.5"
+    "vite": "^5.4.21",
+    "vitest": "^2.1.9"
   }
 }

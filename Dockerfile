@@ -2,22 +2,23 @@ FROM node:20-alpine
 
 WORKDIR /workspace
 
-# Copy package files
+# ── 1. Build the Vite frontend ───────────────────────────────────────────
 COPY app/package*.json ./app/
+RUN cd app && npm ci
 
-# Install dependencies
-WORKDIR /workspace/app
-RUN npm ci
+COPY app/ ./app/
+RUN cd app && npm run build
 
-# Copy the rest of the app files
-COPY app/ .
+# ── 2. Set up the payment + static-file server ───────────────────────────
+COPY server/package*.json ./server/
+RUN cd server && npm ci --omit=dev
 
-# Build the Vite frontend
-RUN npm run build
+COPY server/ ./server/
 
-# Expose port 7860 which is required by Hugging Face Spaces
+# ── 3. Runtime config ────────────────────────────────────────────────────
+ENV NODE_ENV=production
+ENV PORT=7860
+
 EXPOSE 7860
 
-# Start the Express server
-ENV PORT=7860
-CMD ["npm", "run", "server"]
+CMD ["node", "server/src/index.js"]
