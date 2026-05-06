@@ -1,3 +1,12 @@
+---
+title: ShopNow
+emoji: 🛍️
+colorFrom: purple
+colorTo: pink
+sdk: docker
+pinned: false
+---
+
 # ShopNow — 3D-Enabled Smart Fashion eCommerce
 
 ShopNow is a full-stack, client-side, 3D fashion eCommerce platform designed to enhance user experience using interactive 3D product visualization, Razorpay payment integration, and a Myntra-inspired modern UI. 
