@@ -72,8 +72,27 @@ export function CollectionsProvider({ children }) {
   const hiddenAutoIds     = collections.filter(c => c.isAuto && !c.isActive).map(c => c.autoCategory).filter(Boolean);
   const autoExclusions    = {};
 
+  const setAutoImage = useCallback(async (category, imageUrl) => {
+    const col = collections.find(c => c.isAuto && c.autoCategory === category);
+    if (col) await updateCollection(col.id, { image: imageUrl });
+  }, [collections, updateCollection]);
+
+  const setAutoExclusion = useCallback(() => {}, []); // no-op, handled by Supabase
+  const hideAutoCollections = useCallback(async (categories) => {
+    for (const cat of categories) {
+      const col = collections.find(c => c.isAuto && c.autoCategory === cat);
+      if (col) await updateCollection(col.id, { isActive: false });
+    }
+  }, [collections, updateCollection]);
+
   return (
-    <CollectionsContext.Provider value={{ collections, customCollections, autoImages, hiddenAutoIds, autoExclusions, addCollection, updateCollection, deleteCollection, uploadCollectionImage, reload: load }}>
+    <CollectionsContext.Provider value={{
+      collections, customCollections, autoImages, hiddenAutoIds, autoExclusions,
+      addCollection, updateCollection, deleteCollection, uploadCollectionImage, reload: load,
+      // aliases
+      addCustom: addCollection, updateCustom: updateCollection, removeCustom: deleteCollection,
+      setAutoImage, setAutoExclusion, hideAutoCollections,
+    }}>
       {children}
     </CollectionsContext.Provider>
   );

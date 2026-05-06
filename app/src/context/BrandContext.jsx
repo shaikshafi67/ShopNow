@@ -46,7 +46,19 @@ export function BrandProvider({ children }) {
   }, []);
 
   return (
-    <BrandContext.Provider value={{ brand, saveBrand, uploadLogo }}>
+    <BrandContext.Provider value={{
+      brand,
+      // expose top-level for components that destructure directly
+      logoUrl:   brand.logoUrl,
+      brandName: brand.brandName,
+      socials:   brand.socials,
+      saveBrand, uploadLogo,
+      // aliases
+      setLogo:      (url) => saveBrand({ ...brand, logoUrl: url }),
+      clearLogo:    ()    => saveBrand({ ...brand, logoUrl: '/Logo.png' }),
+      setBrandName: (n)   => saveBrand({ ...brand, brandName: n }),
+      setSocials:   (s)   => saveBrand({ ...brand, socials: s }),
+    }}>
       {children}
     </BrandContext.Provider>
   );

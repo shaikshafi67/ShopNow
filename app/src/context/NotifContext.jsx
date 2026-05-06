@@ -58,8 +58,17 @@ export function NotifProvider({ children }) {
 
   const unread = notifs.filter(n => !n.read).length;
 
+  const removeNotif = useCallback(async (id) => {
+    await supabase.from('notifications').delete().eq('id', id);
+    setNotifs(prev => prev.filter(n => n.id !== id));
+  }, []);
+
   return (
-    <NotifContext.Provider value={{ notifs, unread, add, markRead, markAllRead, clearAll }}>
+    <NotifContext.Provider value={{
+      notifs, items: notifs, unread, unreadCount: unread,
+      add, markRead, markAllRead, clearAll,
+      remove: removeNotif,
+    }}>
       {children}
     </NotifContext.Provider>
   );

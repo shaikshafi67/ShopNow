@@ -130,8 +130,16 @@ export function CatalogProvider({ children }) {
     );
   }, [products]);
 
+  const byId = useCallback((id) => products.find(p => p.id === id) ?? null, [products]);
+  const categories = useMemo(() => [...new Set(products.map(p => p.category).filter(Boolean))], [products]);
+
   return (
-    <CatalogContext.Provider value={{ products, loading, addProduct, updateProduct, deleteProduct, decrementStock, uploadProductImage, reload: load, byGender, byCategory, search }}>
+    <CatalogContext.Provider value={{
+      products, loading, byGender, byCategory, byId, search, categories,
+      addProduct, updateProduct, deleteProduct, decrementStock, uploadProductImage, reload: load,
+      // aliases used by some pages/admin
+      create: addProduct, update: updateProduct, remove: deleteProduct,
+    }}>
       {children}
     </CatalogContext.Provider>
   );

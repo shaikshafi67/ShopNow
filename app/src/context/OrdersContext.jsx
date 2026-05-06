@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { addDays, orderId as makeOrderId } from '../utils/format';
 import { useAuth } from './AuthContext';
@@ -132,8 +132,12 @@ export function OrdersProvider({ children }) {
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status, timeline } : o));
   }, [orders]);
 
+  const myOrders  = useMemo(() => user ? orders.filter(o => o.userId === user.id) : [], [orders, user]);
+  const findById  = useCallback((id) => orders.find(o => o.id === id) ?? null, [orders]);
+  const cancel    = useCallback((id) => updateStatus(id, 'cancelled'), [updateStatus]);
+
   return (
-    <OrdersContext.Provider value={{ orders, placeOrder, updateStatus, reload: load }}>
+    <OrdersContext.Provider value={{ orders, myOrders, loading: false, placeOrder, updateStatus, findById, cancel, reload: load }}>
       {children}
     </OrdersContext.Provider>
   );

@@ -95,8 +95,30 @@ export function AuthProvider({ children }) {
     await buildUser(au);
   }, [user, buildUser]);
 
+  const isAuthenticated = !!user;
+  const isAdmin = user?.role === 'admin';
+
+  const resetPassword = useCallback(async (email) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    if (error) throw new Error(error.message);
+  }, []);
+
+  // Admin: fetch all users from profiles
+  const getAllUsers = useCallback(async () => {
+    const { data } = await supabase.from('profiles').select('*');
+    return data ?? [];
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser, addAddress, removeAddress }}>
+    <AuthContext.Provider value={{
+      user, loading, isAuthenticated, isAdmin,
+      login, register, logout,
+      updateUser, updateProfile: updateUser,
+      addAddress, removeAddress,
+      resetPassword,
+      allUsers: [], findByEmail: () => null, // populated by admin context if needed
+      getAllUsers,
+    }}>
       {children}
     </AuthContext.Provider>
   );

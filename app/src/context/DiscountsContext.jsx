@@ -102,7 +102,11 @@ export function DiscountsProvider({ children }) {
   }, []);
 
   return (
-    <DiscountsContext.Provider value={{ discounts, applyCode, incrementUsed, addDiscount, updateDiscount, deleteDiscount }}>
+    <DiscountsContext.Provider value={{
+      discounts, applyCode, incrementUsed,
+      addDiscount, updateDiscount, deleteDiscount,
+      removeDiscount: deleteDiscount, // alias
+    }}>
       {children}
     </DiscountsContext.Provider>
   );
