@@ -10,8 +10,9 @@ export function useCollections() {
 
 const toApp = (c) => ({
   id:           c.id,
-  name:         c.name,
-  slug:         c.slug,
+  name:         c.name  ?? '',
+  title:        c.name  ?? '',  // alias for old code
+  slug:         c.slug  ?? '',
   description:  c.description,
   image:        c.image,
   isAuto:       c.is_auto,
@@ -67,7 +68,12 @@ export function CollectionsProvider({ children }) {
   }, []);
 
   // Derived values expected by HomePage / old code
-  const customCollections = collections.filter(c => !c.isAuto && c.isActive);
+  const customCollections = collections.filter(c => !c.isAuto && c.isActive).map(c => ({
+    ...c,
+    title:     c.name,      // pages use c.title
+    active:    c.isActive,  // pages use c.active
+    productIds: [],         // pages use c.productIds
+  }));
   const autoImages        = Object.fromEntries(collections.filter(c => c.isAuto && c.autoCategory).map(c => [c.autoCategory, c.image]));
   const hiddenAutoIds     = collections.filter(c => c.isAuto && !c.isActive).map(c => c.autoCategory).filter(Boolean);
   const autoExclusions    = {};
