@@ -1,4 +1,4 @@
-import { StrictMode } from 'react'
+import { StrictMode, Component } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
@@ -20,42 +20,64 @@ import { PagesProvider } from './context/PagesContext'
 import { AnnouncementsProvider } from './context/AnnouncementsContext'
 import { PromoProvider } from './context/PromoContext'
 
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(error) { return { error }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 40, fontFamily: 'monospace', color: 'red', background: '#fff' }}>
+          <h2>App crashed — error details:</h2>
+          <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            {this.state.error.message}
+            {'\n\n'}
+            {this.state.error.stack}
+          </pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <ThemeProvider>
-      <LangProvider>
-        <ToastProvider>
-          <AuthProvider>
-            <CatalogProvider>
-              <CartProvider>
-                <WishlistProvider>
-                  <OrdersProvider>
-                    <ReviewsProvider>
-                      <NotifProvider>
-                        <BrandProvider>
-                        <BannersProvider>
-                          <CollectionsProvider>
-                            <DiscountsProvider>
-                              <PagesProvider>
-                                <AnnouncementsProvider>
-                                  <PromoProvider>
-                                    <App />
-                                  </PromoProvider>
-                                </AnnouncementsProvider>
-                              </PagesProvider>
-                            </DiscountsProvider>
-                          </CollectionsProvider>
-                        </BannersProvider>
-                        </BrandProvider>
-                      </NotifProvider>
-                    </ReviewsProvider>
-                  </OrdersProvider>
-                </WishlistProvider>
-              </CartProvider>
-            </CatalogProvider>
-          </AuthProvider>
-        </ToastProvider>
-      </LangProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <LangProvider>
+          <ToastProvider>
+            <AuthProvider>
+              <CatalogProvider>
+                <CartProvider>
+                  <WishlistProvider>
+                    <OrdersProvider>
+                      <ReviewsProvider>
+                        <NotifProvider>
+                          <BrandProvider>
+                            <BannersProvider>
+                              <CollectionsProvider>
+                                <DiscountsProvider>
+                                  <PagesProvider>
+                                    <AnnouncementsProvider>
+                                      <PromoProvider>
+                                        <App />
+                                      </PromoProvider>
+                                    </AnnouncementsProvider>
+                                  </PagesProvider>
+                                </DiscountsProvider>
+                              </CollectionsProvider>
+                            </BannersProvider>
+                          </BrandProvider>
+                        </NotifProvider>
+                      </ReviewsProvider>
+                    </OrdersProvider>
+                  </WishlistProvider>
+                </CartProvider>
+              </CatalogProvider>
+            </AuthProvider>
+          </ToastProvider>
+        </LangProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   </StrictMode>,
 )
