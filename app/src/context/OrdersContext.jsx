@@ -10,6 +10,10 @@ export function useOrders() {
   return ctx;
 }
 
+export const ORDER_STATUS_OPTIONS = [
+  'placed', 'confirmed', 'packed', 'shipped', 'out_for_delivery', 'delivered', 'cancelled',
+];
+
 export const ORDER_STAGES = [
   { id: 'placed',           label: 'Order Placed' },
   { id: 'confirmed',        label: 'Confirmed' },

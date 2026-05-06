@@ -1,6 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
+export const BANNER_HEIGHT_PRESETS = [
+  { id: 'fullscreen', label: 'Full Screen',   vh: null, css: 'calc(100vh - var(--nav-height, 64px))' },
+  { id: 'large',      label: 'Large (80vh)',  vh: 80,   css: '80vh' },
+  { id: 'medium',     label: 'Medium (60vh)', vh: 60,   css: '60vh' },
+  { id: 'small',      label: 'Small (40vh)',  vh: 40,   css: '40vh' },
+  { id: 'custom',     label: 'Custom',        vh: null, css: null   },
+];
+
 const BannersContext = createContext(null);
 export function useBanners() {
   const ctx = useContext(BannersContext);
@@ -56,6 +64,26 @@ export function BannersProvider({ children }) {
     setBanners(prev => prev.filter(b => b.id !== id));
   }, []);
 
+  // aliases expected by AdminBanners
+  const removeBanner = deleteBanner;
+
+  const moveBanner = useCallback(async (id, direction) => {
+    setBanners(prev => {
+      const idx = prev.findIndex(b => b.id === id);
+      if (idx < 0) return prev;
+      const next = [...prev];
+      const swap = direction === 'up' ? idx - 1 : idx + 1;
+      if (swap < 0 || swap >= next.length) return prev;
+      [next[idx], next[swap]] = [next[swap], next[idx]];
+      return next;
+    });
+  }, []);
+
+  const clearHeroImage = useCallback(async (gender) => {
+    await supabase.from('hero_images').upsert({ id: gender, image_url: null, updated_at: new Date().toISOString() });
+    setHeroImages(prev => ({ ...prev, [gender]: null }));
+  }, []);
+
   const setHeroImage = useCallback(async (gender, imageUrl) => {
     await supabase.from('hero_images').upsert({ id: gender, image_url: imageUrl, updated_at: new Date().toISOString() });
     setHeroImages(prev => ({ ...prev, [gender]: imageUrl }));
@@ -75,7 +103,7 @@ export function BannersProvider({ children }) {
   }, []);
 
   return (
-    <BannersContext.Provider value={{ banners, heroImages, bannerSettings, addBanner, updateBanner, deleteBanner, setHeroImage, uploadBannerImage, saveBannerSettings }}>
+    <BannersContext.Provider value={{ banners, heroImages, bannerSettings, addBanner, updateBanner, deleteBanner, removeBanner, moveBanner, clearHeroImage, setHeroImage, uploadBannerImage, saveBannerSettings }}>
       {children}
     </BannersContext.Provider>
   );
