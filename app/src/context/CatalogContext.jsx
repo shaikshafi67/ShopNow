@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
 const CatalogContext = createContext(null);
@@ -112,8 +112,26 @@ export function CatalogProvider({ children }) {
     return publicUrl;
   }, []);
 
+  const byGender = useCallback((gender) =>
+    products.filter(p => p.gender === gender || p.gender === 'unisex'),
+  [products]);
+
+  const byCategory = useCallback((category) =>
+    products.filter(p => p.category?.toLowerCase() === category?.toLowerCase()),
+  [products]);
+
+  const search = useCallback((query) => {
+    const q = query?.toLowerCase() ?? '';
+    return products.filter(p =>
+      p.name?.toLowerCase().includes(q) ||
+      p.description?.toLowerCase().includes(q) ||
+      p.category?.toLowerCase().includes(q) ||
+      p.brand?.toLowerCase().includes(q)
+    );
+  }, [products]);
+
   return (
-    <CatalogContext.Provider value={{ products, loading, addProduct, updateProduct, deleteProduct, decrementStock, uploadProductImage, reload: load }}>
+    <CatalogContext.Provider value={{ products, loading, addProduct, updateProduct, deleteProduct, decrementStock, uploadProductImage, reload: load, byGender, byCategory, search }}>
       {children}
     </CatalogContext.Provider>
   );
