@@ -1,10 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-const url = import.meta.env.VITE_SUPABASE_URL;
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const url = import.meta.env.VITE_SUPABASE_URL || 'https://ptgnbqriunandgwgtvdf.supabase.co';
+const key = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB0Z25icXJpdW5hbmRnd2d0dmRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwNTg0MzEsImV4cCI6MjA5MzYzNDQzMX0.JSBTkxZQMLPyH33Ofrfu8BlEXqCq723q9C1VpJv71uk';
 
-if (!url || !key) {
-  console.warn('Supabase env vars missing — VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY');
-}
-
-export const supabase = createClient(url ?? '', key ?? '');
+export const supabase = createClient(url, key);
