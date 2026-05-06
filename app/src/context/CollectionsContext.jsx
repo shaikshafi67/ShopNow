@@ -66,8 +66,14 @@ export function CollectionsProvider({ children }) {
     return publicUrl;
   }, []);
 
+  // Derived values expected by HomePage / old code
+  const customCollections = collections.filter(c => !c.isAuto && c.isActive);
+  const autoImages        = Object.fromEntries(collections.filter(c => c.isAuto && c.autoCategory).map(c => [c.autoCategory, c.image]));
+  const hiddenAutoIds     = collections.filter(c => c.isAuto && !c.isActive).map(c => c.autoCategory).filter(Boolean);
+  const autoExclusions    = {};
+
   return (
-    <CollectionsContext.Provider value={{ collections, addCollection, updateCollection, deleteCollection, uploadCollectionImage, reload: load }}>
+    <CollectionsContext.Provider value={{ collections, customCollections, autoImages, hiddenAutoIds, autoExclusions, addCollection, updateCollection, deleteCollection, uploadCollectionImage, reload: load }}>
       {children}
     </CollectionsContext.Provider>
   );

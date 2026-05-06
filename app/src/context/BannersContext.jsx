@@ -103,7 +103,7 @@ export function BannersProvider({ children }) {
   }, []);
 
   return (
-    <BannersContext.Provider value={{ banners, heroImages, bannerSettings, addBanner, updateBanner, deleteBanner, removeBanner, moveBanner, clearHeroImage, setHeroImage, uploadBannerImage, saveBannerSettings }}>
+    <BannersContext.Provider value={{ banners, activeBanners: banners.filter(b => b.active), heroImages, bannerSettings, addBanner, updateBanner, deleteBanner, removeBanner, moveBanner, clearHeroImage, setHeroImage, uploadBannerImage, saveBannerSettings }}>
       {children}
     </BannersContext.Provider>
   );
