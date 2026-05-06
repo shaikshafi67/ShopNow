@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { read, write, uid } from '../utils/storage';
+import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 import { useOrders } from './OrdersContext';
 
@@ -10,11 +10,27 @@ export function useReviews() {
   return ctx;
 }
 
+const toApp = (r) => ({
+  id:        r.id,
+  productId: r.product_id,
+  userId:    r.user_id,
+  userName:  r.user_name,
+  rating:    r.rating,
+  title:     r.title,
+  body:      r.body,
+  verified:  r.verified,
+  createdAt: r.created_at,
+});
+
 export function ReviewsProvider({ children }) {
   const { user } = useAuth();
   const { orders } = useOrders();
-  const [reviews, setReviews] = useState(() => read('reviews', []));
-  useEffect(() => { write('reviews', reviews); }, [reviews]);
+  const [reviews, setReviews] = useState([]);
+
+  useEffect(() => {
+    supabase.from('reviews').select('*').order('created_at', { ascending: false })
+      .then(({ data }) => setReviews((data ?? []).map(toApp)));
+  }, []);
 
   const hasPurchased = useCallback((productId) => {
     if (!user) return false;
@@ -35,26 +51,29 @@ export function ReviewsProvider({ children }) {
     return { count: list.length, avg: Math.round(avg * 10) / 10, breakdown };
   }, [reviews]);
 
-  const submit = useCallback(({ productId, rating, title, body }) => {
+  const submit = useCallback(async ({ productId, rating, title, body }) => {
     if (!user) throw new Error('You must be signed in to leave a review.');
     if (!rating || rating < 1 || rating > 5) throw new Error('Please pick a rating from 1 to 5.');
     if (!body?.trim()) throw new Error('Please write a short review.');
-    const review = {
-      id: uid('rev'),
-      productId,
-      userId: user.id,
-      userName: user.name,
+
+    const { data, error } = await supabase.from('reviews').insert({
+      product_id: productId,
+      user_id:    user.id,
+      user_name:  user.name || 'Anonymous',
       rating,
-      title: (title || '').trim(),
-      body: body.trim(),
-      verified: hasPurchased(productId),
-      createdAt: new Date().toISOString(),
-    };
+      title:      (title || '').trim(),
+      body:       body.trim(),
+      verified:   hasPurchased(productId),
+    }).select().single();
+
+    if (error) throw new Error(error.message);
+    const review = toApp(data);
     setReviews((arr) => [review, ...arr]);
     return review;
   }, [user, hasPurchased]);
 
-  const remove = useCallback((reviewId) => {
+  const remove = useCallback(async (reviewId) => {
+    await supabase.from('reviews').delete().eq('id', reviewId);
     setReviews((arr) => arr.filter((r) => r.id !== reviewId));
   }, []);
 
