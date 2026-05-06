@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently --kill-others-on-fail \"vite\" \"node ../server/src/index.js\" --names \"app,pay\" --prefix-colors \"cyan,green\"",
+    "dev": "npx kill-port 5173 3001 --silent & concurrently --kill-others-on-fail \"vite\" \"node ../server/src/index.js\" --names \"app,pay\" --prefix-colors \"cyan,green\"",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",

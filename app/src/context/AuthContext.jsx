@@ -33,11 +33,13 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) =>
-      buildUser(session?.user ?? null).finally(() => setLoading(false))
-    );
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => buildUser(session?.user ?? null))
+      .catch(() => setUser(null))
+      .finally(() => setLoading(false));
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) =>
-      buildUser(session?.user ?? null)
+      buildUser(session?.user ?? null).catch(() => setUser(null))
     );
     return () => subscription.unsubscribe();
   }, [buildUser]);
@@ -95,7 +97,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser, addAddress, removeAddress }}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 }
