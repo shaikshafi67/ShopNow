@@ -111,14 +111,6 @@ export function AuthProvider({ children }) {
 
     const { user: fbUser } = await signInWithEmailAndPassword(auth, email, pass);
 
-    // Admin bypasses email verification requirement
-    const isAdmin = email === 'admin@shopnow.local';
-
-    if (!fbUser.emailVerified && !isAdmin) {
-      await signOut(auth);
-      throw new Error('Please verify your email first. Check your inbox for the verification link.');
-    }
-
     const profile = await getOrCreateProfile(fbUser);
     const appUser = buildUser(fbUser, profile);
     setUser(appUser);
@@ -131,20 +123,13 @@ export function AuthProvider({ children }) {
     const em   = typeof nameOrForm === 'object' ? nameOrForm.email    : email;
     const pass = typeof nameOrForm === 'object' ? nameOrForm.password : password;
 
+    // OTP already verified by server before this is called
     const { user: fbUser } = await createUserWithEmailAndPassword(auth, em, pass);
     await fbUpdateProfile(fbUser, { displayName: name });
-
-    // Send Firebase verification email (free, no EmailJS needed)
-    await sendEmailVerification(fbUser);
-
-    // Create Supabase profile
-    await getOrCreateProfile(fbUser, name);
-
-    // Sign out until email is verified
-    await signOut(auth);
-
-    // Return basic info so RegisterPage can show success message
-    return { name, email: em };
+    const profile = await getOrCreateProfile(fbUser, name);
+    const appUser = buildUser(fbUser, profile);
+    setUser(appUser);
+    return appUser;
   }, []);
 
   // ── Resend verification email ─────────────────────────────────────────
