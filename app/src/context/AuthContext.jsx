@@ -44,16 +44,23 @@ export function AuthProvider({ children }) {
     return () => subscription.unsubscribe();
   }, [buildUser]);
 
-  const register = useCallback(async (name, email, password) => {
+  const register = useCallback(async (nameOrForm, email, password) => {
+    // Support both register(name, email, password) and register({ name, email, password })
+    const name = typeof nameOrForm === 'object' ? nameOrForm.name  : nameOrForm;
+    const em   = typeof nameOrForm === 'object' ? nameOrForm.email    : email;
+    const pass = typeof nameOrForm === 'object' ? nameOrForm.password : password;
     const { data, error } = await supabase.auth.signUp({
-      email, password, options: { data: { name } },
+      email: em, password: pass, options: { data: { name } },
     });
     if (error) throw new Error(error.message);
     return data.user;
   }, []);
 
-  const login = useCallback(async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const login = useCallback(async (emailOrForm, password) => {
+    // Support both login(email, password) and login({ email, password })
+    const email = typeof emailOrForm === 'object' ? emailOrForm.email : emailOrForm;
+    const pass  = typeof emailOrForm === 'object' ? emailOrForm.password : password;
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
     if (error) throw new Error(error.message);
     return data.user;
   }, []);
