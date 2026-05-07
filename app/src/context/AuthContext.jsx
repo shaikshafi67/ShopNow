@@ -6,6 +6,8 @@ import {
   onAuthStateChanged,
   updateProfile as fbUpdateProfile,
   sendPasswordResetEmail,
+  sendEmailVerification,
+  reload,
 } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { supabase } from '../lib/supabase';
@@ -102,32 +104,54 @@ export function AuthProvider({ children }) {
     return unsub;
   }, []);
 
-  // ── Login — returns full user object (LoginPage needs u.name & u.role) ──
+  // ── Login — checks email verification before allowing in ──────────────
   const login = useCallback(async (emailOrForm, password) => {
     const email = typeof emailOrForm === 'object' ? emailOrForm.email    : emailOrForm;
     const pass  = typeof emailOrForm === 'object' ? emailOrForm.password : password;
 
     const { user: fbUser } = await signInWithEmailAndPassword(auth, email, pass);
-    const profile  = await getOrCreateProfile(fbUser);
-    const appUser  = buildUser(fbUser, profile);
+
+    // Admin bypasses email verification requirement
+    const isAdmin = email === 'admin@shopnow.local';
+
+    if (!fbUser.emailVerified && !isAdmin) {
+      await signOut(auth);
+      throw new Error('Please verify your email first. Check your inbox for the verification link.');
+    }
+
+    const profile = await getOrCreateProfile(fbUser);
+    const appUser = buildUser(fbUser, profile);
     setUser(appUser);
-    return appUser;   // ← LoginPage uses u.name and u.role from this
+    return appUser;
   }, []);
 
-  // ── Register — returns full user object (RegisterPage needs u.name) ──
+  // ── Register — creates account and sends Firebase verification email ───
   const register = useCallback(async (nameOrForm, email, password) => {
     const name = typeof nameOrForm === 'object' ? nameOrForm.name     : nameOrForm;
     const em   = typeof nameOrForm === 'object' ? nameOrForm.email    : email;
     const pass = typeof nameOrForm === 'object' ? nameOrForm.password : password;
 
     const { user: fbUser } = await createUserWithEmailAndPassword(auth, em, pass);
-    // Set display name in Firebase
     await fbUpdateProfile(fbUser, { displayName: name });
-    // Create Supabase profile with name
-    const profile = await getOrCreateProfile(fbUser, name);
-    const appUser = buildUser(fbUser, profile);
-    setUser(appUser);
-    return appUser;   // ← RegisterPage uses u.name from this
+
+    // Send Firebase verification email (free, no EmailJS needed)
+    await sendEmailVerification(fbUser);
+
+    // Create Supabase profile
+    await getOrCreateProfile(fbUser, name);
+
+    // Sign out until email is verified
+    await signOut(auth);
+
+    // Return basic info so RegisterPage can show success message
+    return { name, email: em };
+  }, []);
+
+  // ── Resend verification email ─────────────────────────────────────────
+  const resendVerification = useCallback(async (email, password) => {
+    const { user: fbUser } = await signInWithEmailAndPassword(auth, email, password);
+    await sendEmailVerification(fbUser);
+    await signOut(auth);
   }, []);
 
   // ── Logout ────────────────────────────────────────────────────────────
@@ -190,7 +214,7 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={{
       user, loading, isAuthenticated, isAdmin,
-      login, register, logout,
+      login, register, logout, resendVerification,
       updateUser, updateProfile: updateUser,
       addAddress, removeAddress, resetPassword,
       allUsers: [], findByEmail: () => null,
