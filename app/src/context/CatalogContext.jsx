@@ -75,8 +75,13 @@ export function CatalogProvider({ children }) {
   }, [load]);
 
   const addProduct = useCallback(async (product) => {
-    const { data, error } = await supabase.from('products').insert(toDB(product)).select().single();
-    if (error) throw new Error(error.message);
+    const dbRow = toDB(product);
+    console.log('[Catalog] Inserting product:', dbRow);
+    const { data, error } = await supabase.from('products').insert(dbRow).select().single();
+    if (error) {
+      console.error('[Catalog] Insert error:', error);
+      throw new Error(error.message);
+    }
     const p = toApp(data);
     setProducts(prev => [p, ...prev]);
     return p;
