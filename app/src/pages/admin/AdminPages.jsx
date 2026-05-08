@@ -54,9 +54,13 @@ export default function AdminPages() {
     setView('edit');
   };
 
-  const handleAddPage = () => {
-    const page = createPage({ title: 'Untitled page', slug: 'untitled-' + Date.now() });
-    openEdit(page);
+  const handleAddPage = async () => {
+    try {
+      const page = await createPage({ title: 'Untitled page', slug: 'untitled-' + Date.now() });
+      openEdit(page);
+    } catch (err) {
+      toast.error(err.message || 'Failed to create page');
+    }
   };
   const navPage = (dir) => {
     const next = pages[editIdx + dir];

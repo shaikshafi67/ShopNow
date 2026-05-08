@@ -57,8 +57,23 @@ export function PagesProvider({ children }) {
 
   const getBySlug = useCallback((slug) => pages.find(p => p.slug === slug), [pages]);
 
+  const bulkDelete = useCallback(async (ids) => {
+    await supabase.from('pages').delete().in('id', ids);
+    setPages(prev => prev.filter(p => !ids.includes(p.id)));
+  }, []);
+
+  const bulkSetStatus = useCallback(async (ids, status) => {
+    await supabase.from('pages').update({ status }).in('id', ids);
+    setPages(prev => prev.map(p => ids.includes(p.id) ? { ...p, status } : p));
+  }, []);
+
   return (
-    <PagesContext.Provider value={{ pages, addPage, updatePage, deletePage, getBySlug }}>
+    <PagesContext.Provider value={{
+      pages, addPage, updatePage, deletePage, getBySlug,
+      createPage: addPage,   // alias used by AdminPages
+      bulkDelete,
+      bulkSetStatus,
+    }}>
       {children}
     </PagesContext.Provider>
   );
