@@ -41,7 +41,7 @@ const toDB = (p) => ({
   rating:        p.rating ?? 4.0,
   reviews:       p.reviews ?? 0,
   category:      p.category ?? '',
-  gender:        p.gender ?? 'unisex',
+  gender:        ['men','women','unisex'].includes(p.gender) ? p.gender : 'unisex',
   brand:         p.brand ?? 'ShopNow',
   tag:           p.tag ?? 'New',
   images:        Array.isArray(p.images) ? p.images : [],
@@ -52,7 +52,7 @@ const toDB = (p) => ({
   free_shipping: p.freeShipping ?? false,
   weight:        p.weight ?? null,
   sku:           p.sku ?? null,
-  is_active:     p.isActive !== false,
+  is_active:     p.availability !== 'draft' && p.isActive !== false,
 });
 
 export function CatalogProvider({ children }) {

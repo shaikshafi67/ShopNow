@@ -491,13 +491,15 @@ export default function AdminAddProduct() {
         if (wasOutOfStock && nowInStock) {
           sendStockNotifications(id, payload.name, payload.brand);
         }
-        update(id, payload);
+        await update(id, payload);
       } else {
-        create(payload);
+        await create(payload);
       }
 
       setSaved(true);
       setTimeout(() => navigate('/admin/products'), 1200);
+    } catch (err) {
+      toast.error(err.message || 'Failed to save product');
     } finally { setSaving(false); }
   };
 
