@@ -69,7 +69,9 @@ export function PagesProvider({ children }) {
 
   return (
     <PagesContext.Provider value={{
-      pages, addPage, updatePage, deletePage, getBySlug,
+      pages, addPage, updatePage, deletePage,
+      getBySlug,
+      getPage: getBySlug,    // alias used by InfoPages
       createPage: addPage,   // alias used by AdminPages
       bulkDelete,
       bulkSetStatus,
