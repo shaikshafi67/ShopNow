@@ -369,7 +369,7 @@ export default function AdminAddProduct() {
     if (!form.sellingPrice)       e.sellingPrice= 'Selling price is required';
     if (!form.mrp)                e.mrp         = 'MRP is required';
     if (parseFloat(form.sellingPrice) > parseFloat(form.mrp)) e.sellingPrice = 'Selling price cannot exceed MRP';
-    if (form.images.length === 0) e.images = 'Add at least one product card image in the Media tab';
+    // Images optional — products can be saved without images (add via edit later)
     setErrors(e);
     if (Object.keys(e).length > 0) {
       const tabMap = { name:'basic', category:'basic', gender:'basic', sellingPrice:'pricing', mrp:'pricing', images:'media' };
@@ -427,7 +427,7 @@ export default function AdminAddProduct() {
   const uploadIfNeeded = async (imgObj, tempId) => {
     const src = imgObj?.src || imgObj;
     if (!src) return null;
-    // Already a hosted URL — use as-is
+    // Already a hosted URL (not base64/blob) — use as-is
     if (typeof src === 'string' && !src.startsWith('data:') && !src.startsWith('blob:')) return src;
     try {
       const res  = await fetch(src);
@@ -435,8 +435,9 @@ export default function AdminAddProduct() {
       const ext  = blob.type.split('/')[1] || 'jpg';
       const file = new File([blob], `${Date.now()}.${ext}`, { type: blob.type });
       return await uploadProductImage(file, tempId);
-    } catch {
-      return src; // fallback to original if upload fails
+    } catch (err) {
+      console.warn('[Upload] Storage upload failed, skipping image:', err.message);
+      return null; // skip this image rather than store huge data URL
     }
   };
 
