@@ -121,7 +121,7 @@ function Field({ label: lbl, children, hint, error }) {
 export default function AdminAddProduct() {
   const navigate   = useNavigate();
   const { id }     = useParams();
-  const { create, update, byId, products, categories: catalogCategories } = useCatalog();
+  const { create, update, byId, products, categories: catalogCategories, uploadProductImage } = useCatalog();
   const { customCollections } = useCollections();
   const isEdit     = !!id;
 
@@ -423,10 +423,35 @@ export default function AdminAddProduct() {
   }
 
   // ── Save ─────────────────────────────────────────────────────────────────────
+  // Upload a base64/blob image to Supabase Storage and return the public URL
+  const uploadIfNeeded = async (imgObj, tempId) => {
+    const src = imgObj?.src || imgObj;
+    if (!src) return null;
+    // Already a hosted URL — use as-is
+    if (typeof src === 'string' && !src.startsWith('data:') && !src.startsWith('blob:')) return src;
+    try {
+      const res  = await fetch(src);
+      const blob = await res.blob();
+      const ext  = blob.type.split('/')[1] || 'jpg';
+      const file = new File([blob], `${Date.now()}.${ext}`, { type: blob.type });
+      return await uploadProductImage(file, tempId);
+    } catch {
+      return src; // fallback to original if upload fails
+    }
+  };
+
   const handleSave = async () => {
     if (!validate()) return;
     setSaving(true);
     try {
+      const tempId = `p_${Date.now()}`;
+
+      // Upload all data-URL images to Supabase Storage first
+      const uploadedImages = await Promise.all(
+        form.images.map(img => uploadIfNeeded(img, tempId))
+      );
+      const finalImages = uploadedImages.filter(Boolean);
+
       const mrp = parseFloat(form.mrp)          || 0;
       const sp  = parseFloat(form.sellingPrice)  || 0;
       const payload = {
@@ -449,8 +474,8 @@ export default function AdminAddProduct() {
           : parseInt(form.stock, 10) || 0,
         lowStockAlert:   parseInt(form.lowStockAlert, 10) || 5,
         availability:    form.availability,
-        // Media tab images = product card thumbnail shown in listing grids
-        images:          form.images.map(i => i.src || i),
+        // Media tab images — already uploaded to Supabase Storage
+        images:          finalImages,
         // Sizes: from color sizeVariants when colors exist, else from global variants
         sizes: form.colorVariants.length > 0
           ? [...new Set(form.colorVariants.flatMap(cv => (cv.sizeVariants || []).map(sv => sv.size)).filter(Boolean))]
