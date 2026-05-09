@@ -57,9 +57,8 @@ function readMediaFile(file, onResult, onError) {
   reader.onload = async (e) => {
     const dataUrl = e.target.result;
     if (isImg) {
-      // Compress images to fit within IDB limits
-      const compressed = await compressHeroImage(dataUrl);
-      onResult(compressed);
+      // Pass both the data URL (for preview) and the original file (for storage upload)
+      onResult(dataUrl, file);
     } else {
       onResult(dataUrl);
     }
@@ -195,16 +194,17 @@ function BannerForm({ initial = EMPTY_FORM, onSave, onCancel }) {
 function HeroImageUpload({ side, label, accent, image, onUpload, onClear }) {
   const fileRef = useRef(null);
   const [drag, setDrag] = useState(false);
-  const [pending, setPending] = useState(null); // selected but not yet saved
+  const [pending, setPending]     = useState(null); // data URL for preview
+  const [pendingFile, setPendingFile] = useState(null); // original File for upload
 
   function readFile(file) {
     readMediaFile(
       file,
-      (result) => setPending(result),
+      (dataUrl, originalFile) => { setPending(dataUrl); setPendingFile(originalFile ?? null); },
       (errMsg) => alert(errMsg)
     );
   }
-  function handleSave() { onUpload(pending); setPending(null); }
+  function handleSave() { onUpload(pending, pendingFile); setPending(null); setPendingFile(null); }
   function handleCancelPending() { setPending(null); fileRef.current && (fileRef.current.value = ''); }
 
   const display = pending ?? image; // what to show in the preview box
@@ -296,7 +296,7 @@ function HeroImageUpload({ side, label, accent, image, onUpload, onClear }) {
 }
 
 export default function AdminBanners() {
-  const { banners, loading, addBanner, updateBanner, removeBanner, moveBanner, heroImages, setHeroImage, clearHeroImage } = useBanners();
+  const { banners, loading, addBanner, updateBanner, removeBanner, moveBanner, heroImages, setHeroImage, clearHeroImage, uploadBannerImage } = useBanners();
   const toast = useToast();
   const [mode, setMode] = useState(null);
 
@@ -365,13 +365,37 @@ export default function AdminBanners() {
           <HeroImageUpload
             side="men" label="Men's Hero Photo" accent="#7c6aff"
             image={heroImages.men}
-            onUpload={img => { setHeroImage('men', img); toast.success('Men\'s hero photo updated!'); }}
+            onUpload={async (dataUrl, file) => {
+              try {
+                // Upload original file to Supabase Storage (no compression)
+                const url = file
+                  ? await uploadBannerImage(file, 'hero')
+                  : dataUrl;
+                setHeroImage('men', url);
+                toast.success('Men\'s hero photo updated!');
+              } catch {
+                // Fallback: store data URL if storage unavailable
+                setHeroImage('men', dataUrl);
+                toast.success('Men\'s hero photo updated!');
+              }
+            }}
             onClear={() => { clearHeroImage('men'); toast.info('Men\'s hero photo removed.'); }}
           />
           <HeroImageUpload
             side="women" label="Women's Hero Photo" accent="#ff6a9a"
             image={heroImages.women}
-            onUpload={img => { setHeroImage('women', img); toast.success('Women\'s hero photo updated!'); }}
+            onUpload={async (dataUrl, file) => {
+              try {
+                const url = file
+                  ? await uploadBannerImage(file, 'hero')
+                  : dataUrl;
+                setHeroImage('women', url);
+                toast.success('Women\'s hero photo updated!');
+              } catch {
+                setHeroImage('women', dataUrl);
+                toast.success('Women\'s hero photo updated!');
+              }
+            }}
             onClear={() => { clearHeroImage('women'); toast.info('Women\'s hero photo removed.'); }}
           />
         </div>
