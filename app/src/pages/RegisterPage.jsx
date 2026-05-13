@@ -2,12 +2,14 @@ import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { UserPlus, Mail, CheckCircle, RefreshCw, ArrowLeft } from 'lucide-react';
+import emailjs from '@emailjs/browser';
 import AuthShell, { FormField } from '../components/AuthShell';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
-// Server API base — same origin in production, localhost in dev
-const API = import.meta.env.DEV ? 'http://localhost:3001' : '';
+const EJS_SERVICE  = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+const EJS_TEMPLATE = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
+const EJS_KEY      = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
 
 /* ── 6-box OTP Input ─────────────────────────────────────────────────── */
 function OTPInput({ value, onChange }) {
@@ -62,15 +64,14 @@ export default function RegisterPage() {
   const toast        = useToast();
   const navigate     = useNavigate();
 
-  const [step, setStep]           = useState('form');
-  const [form, setForm]           = useState({ name: '', email: '', phone: '', password: '', confirm: '' });
-  const [busy, setBusy]           = useState(false);
-  const [error, setError]         = useState(null);
-  const [demoOtp, setDemoOtp]     = useState('');   // shown on screen only when email not configured
-  const [otpInput, setOtpInput]   = useState('');
-  const [otpError, setOtpError]   = useState('');
-  const [emailSent, setEmailSent] = useState(false);
-  const [cooldown, setCooldown]   = useState(0);
+  const [step, setStep]         = useState('form');
+  const [form, setForm]         = useState({ name: '', email: '', phone: '', password: '', confirm: '' });
+  const [busy, setBusy]         = useState(false);
+  const [error, setError]       = useState(null);
+  const [otpInput, setOtpInput] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [cooldown, setCooldown] = useState(0);
+  const otpRef = useRef(''); // stored in memory only — never shown on screen
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -101,45 +102,24 @@ export default function RegisterPage() {
   };
 
   const sendOTP = async () => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
-    try {
-      const res = await fetch(`${API}/api/send-otp`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ email: form.email, name: form.name }),
-        signal:  controller.signal,
-      });
-      clearTimeout(timeout);
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to send OTP');
-      setEmailSent(data.sent);
-      setDemoOtp(data.otp || '');
-      setCooldown(60);
-    } catch (err) {
-      clearTimeout(timeout);
-      if (err.name === 'AbortError') throw new Error('Server not reachable. Please try again later.');
-      throw err;
-    }
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    otpRef.current = otp; // store in memory only
+    await emailjs.send(
+      EJS_SERVICE, EJS_TEMPLATE,
+      { to_name: form.name, to_email: form.email, otp },
+      { publicKey: EJS_KEY }
+    );
+    setCooldown(60);
   };
 
-  /* ── Step 2: Verify OTP via server, then create Firebase account ── */
+  /* ── Step 2: Verify OTP locally, then create Firebase account ── */
   const verifyOtp = async () => {
     setOtpError('');
     if (otpInput.length < 6) { setOtpError('Enter the full 6-digit code.'); return; }
+    if (otpInput !== otpRef.current) { setOtpError('Incorrect code. Please try again.'); setOtpInput(''); return; }
 
     setBusy(true);
     try {
-      // Verify OTP with server
-      const res  = await fetch(`${API}/api/verify-otp`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ email: form.email, otp: otpInput }),
-      });
-      const data = await res.json();
-      if (!data.valid) { setOtpError(data.error || 'Incorrect code.'); setOtpInput(''); return; }
-
-      // OTP correct → create Firebase account
       const u = await register({ ...form });
       toast.success(`Welcome, ${u.name.split(' ')[0]}! Account created ✓`);
       navigate('/', { replace: true });
@@ -156,8 +136,8 @@ export default function RegisterPage() {
     setOtpInput(''); setOtpError('');
     try {
       await sendOTP();
-      toast.info(emailSent ? 'New code sent to your email.' : 'New code generated.');
-    } catch { toast.error('Could not resend. Try again.'); }
+      toast.info('New code sent to your email.');
+    } catch { toast.error('Could not send email. Try again.'); }
   };
 
   /* ── Step 1: Registration form ── */
@@ -212,16 +192,9 @@ export default function RegisterPage() {
           <Mail size={32} color="var(--accent)" />
         </motion.div>
 
-        {emailSent ? (
-          <div style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 10, padding: '10px 18px', fontSize: 13, color: '#16a34a', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <CheckCircle size={15} /> Code sent to <strong>{form.email}</strong>
-          </div>
-        ) : (
-          <div style={{ background: 'rgba(124,106,255,0.08)', border: '1px dashed rgba(124,106,255,0.3)', borderRadius: 10, padding: '10px 18px', fontSize: 13, color: 'var(--text-secondary)' }}>
-            Demo mode — your code is{' '}
-            <span style={{ fontWeight: 800, fontSize: 20, color: 'var(--accent)', letterSpacing: 3 }}>{demoOtp}</span>
-          </div>
-        )}
+        <div style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 10, padding: '10px 18px', fontSize: 13, color: '#16a34a', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <CheckCircle size={15} /> Code sent to <strong>{form.email}</strong>
+        </div>
       </div>
 
       <div style={{ marginBottom: 20 }}>
