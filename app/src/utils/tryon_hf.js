@@ -1,18 +1,10 @@
 /**
  * tryon_hf.js
- * Step 1: IDM-VTON  — virtual try-on (tries multiple spaces in order)
- * Step 2: CodeFormer — face restore + background enhance + 2x upscale
+ * Primary:  Kwai-Kolors/Kolors-Virtual-Try-On (running, free)
+ * Fallback: franciszzj/Leffa (running, free, ZeroGPU)
  */
 
 const HF_TOKEN = import.meta.env.VITE_HF_TOKEN || '';
-
-// Original yisol/IDM-VTON has a ZeroGPU config error — use working duplicates
-const TRYON_SPACES = [
-  'kadirnar/IDM-VTON',
-  'pngwn/IDM-VTON',
-  'jjlealse/IDM-VTON',
-  'John6666/IDM-VTON',
-];
 
 async function getClient(space) {
   const { Client } = await import('@gradio/client');
@@ -22,7 +14,7 @@ async function getClient(space) {
   });
 }
 
-// ── Convert any URL (including data:) to a Blob ───────────────────────────────
+// Convert any URL (including data:) to a Blob
 async function urlToBlob(url) {
   if (url.startsWith('data:')) {
     const [meta, b64] = url.split(',');
@@ -35,55 +27,11 @@ async function urlToBlob(url) {
   return resp.blob();
 }
 
-// ── Step 1: Virtual try-on ────────────────────────────────────────────────────
-async function runTryOn(client, personFile, garmentUrl, onStatus) {
-  onStatus?.('Uploading garment...');
-  const garmentBlob = await urlToBlob(garmentUrl);
-
-  onStatus?.('Running AI try-on (30–60 sec)...');
-  const result = await client.predict('/tryon', {
-    dict: { background: personFile, layers: [], composite: null },
-    garm_img: garmentBlob,
-    garment_des: 'clothing garment',
-    is_checked: true,
-    is_checked_crop: true,
-    denoise_steps: 40,
-    seed: 42,
-  });
-
-  const out = result.data?.[0];
-  if (!out) throw new Error('No output from try-on model');
-  return out?.url ?? (typeof out === 'string' ? out : null);
-}
-
-// ── Step 2: Enhance with CodeFormer (upscale + face restore + bg enhance) ─────
-async function runEnhance(imageUrl, onStatus) {
-  onStatus?.('Enhancing image quality...');
-  try {
-    const client = await getClient('sczhou/CodeFormer');
-
-    const result = await client.predict('/inference', {
-      image: { url: imageUrl, orig_name: 'tryon.png', meta: { _type: 'gradio.FileData' } },
-      face_align: true,
-      background_enhance: true,
-      face_upsample: true,
-      upscale: 2,
-      codeformer_fidelity: 0.7,
-    });
-
-    const out = result.data?.[0];
-    return out?.url ?? imageUrl;
-  } catch (err) {
-    console.warn('[CodeFormer] enhance failed, using original:', err.message);
-    return imageUrl;
-  }
-}
-
-// ── Convert any URL to a local blob URL (avoids CORS in Three.js / canvas) ───
+// Convert any URL to a local blob URL (avoids CORS in Three.js / canvas)
 async function toBlobUrl(url) {
   try {
     const resp = await fetch(url, {
-      headers: { Authorization: `Bearer ${HF_TOKEN}` },
+      headers: HF_TOKEN ? { Authorization: `Bearer ${HF_TOKEN}` } : {},
     });
     if (!resp.ok) throw new Error(`fetch ${resp.status}`);
     const blob = await resp.blob();
@@ -93,54 +41,86 @@ async function toBlobUrl(url) {
   }
 }
 
-// ── Unified export: tries Replicate first, falls back to HF spaces ───────────
-export async function runVirtualTryOn({ personFile, garmentUrl, onStatus }) {
-  let replicateError = null;
+// ── Kolors Virtual Try-On ─────────────────────────────────────────────────────
+async function runKolorsTryOn(personFile, garmentUrl, onStatus) {
+  onStatus?.('Connecting to Kolors AI...');
+  const client = await getClient('Kwai-Kolors/Kolors-Virtual-Try-On');
 
-  // Try Replicate first — faster and more reliable
-  try {
-    const { runReplicateTryOn } = await import('./tryon_replicate.js');
-    return await runReplicateTryOn({ personFile, garmentUrl, onStatus });
-  } catch (err) {
-    replicateError = err.message;
-    console.warn('[TryOn] Replicate failed:', err.message);
-    onStatus?.(`Replicate failed (${err.message}), trying HF…`);
-  }
+  onStatus?.('Uploading garment...');
+  const garmentBlob = await urlToBlob(garmentUrl);
 
-  // Fall back to HF community spaces
-  try {
-    return await runHFTryOn({ personFile, garmentUrl, onStatus });
-  } catch (hfErr) {
-    throw new Error(`Replicate: ${replicateError} | HF: ${hfErr.message}`);
-  }
+  onStatus?.('Running AI try-on (30–60 sec)...');
+  const result = await client.predict('/tryon', {
+    person_img:      personFile,
+    garment_img:     garmentBlob,
+    seed:            42,
+    randomize_seed:  false,
+  });
+
+  const out = result.data?.[0];
+  if (!out) throw new Error('No output from Kolors try-on');
+  return out?.url ?? (typeof out === 'string' ? out : null);
 }
 
-// ── HF spaces fallback chain ──────────────────────────────────────────────────
-async function runHFTryOn({ personFile, garmentUrl, onStatus }) {
-  let lastError;
+// ── Leffa Virtual Try-On (fallback) ──────────────────────────────────────────
+async function runLeffaTryOn(personFile, garmentUrl, onStatus) {
+  onStatus?.('Connecting to Leffa AI...');
+  const client = await getClient('franciszzj/Leffa');
 
-  for (const space of TRYON_SPACES) {
+  onStatus?.('Uploading garment...');
+  const garmentBlob = await urlToBlob(garmentUrl);
+
+  onStatus?.('Running AI try-on (30–60 sec)...');
+  const result = await client.predict('/leffa_predict_vt', {
+    src_image_path:   personFile,
+    ref_image_path:   garmentBlob,
+    vt_garment_type:  'upper_body',
+    step:             30,
+    scale:            2.5,
+    seed:             42,
+  });
+
+  const out = result.data?.[0];
+  if (!out) throw new Error('No output from Leffa try-on');
+  return out?.url ?? (typeof out === 'string' ? out : null);
+}
+
+// ── Main export: tries Kolors first, falls back to Leffa ─────────────────────
+export async function runVirtualTryOn({ personFile, garmentUrl, onStatus }) {
+  // Try Replicate first if token is set
+  const replicateToken = import.meta.env.VITE_REPLICATE_TOKEN || '';
+  if (replicateToken) {
     try {
-      onStatus?.(`Connecting to AI model (${space})...`);
-      console.log('[TryOn] Trying space:', space);
-      const tryOnClient = await getClient(space);
-
-      const tryOnUrl = await runTryOn(tryOnClient, personFile, garmentUrl, onStatus);
-      if (!tryOnUrl) throw new Error('Try-on produced no result URL');
-
-      const enhancedUrl = await runEnhance(tryOnUrl, onStatus);
-
-      onStatus?.('Preparing image...');
-      const blobUrl = await toBlobUrl(enhancedUrl);
-
-      onStatus?.('Done!');
-      console.log('[TryOn] Success with space:', space);
-      return blobUrl;
+      const { runReplicateTryOn } = await import('./tryon_replicate.js');
+      return await runReplicateTryOn({ personFile, garmentUrl, onStatus });
     } catch (err) {
-      console.warn(`[TryOn] Space ${space} failed:`, err.message);
-      lastError = err;
+      console.warn('[TryOn] Replicate failed:', err.message);
     }
   }
 
-  throw new Error(`All try-on spaces failed. Last error: ${lastError?.message}`);
+  // Try Kolors (primary free option)
+  try {
+    onStatus?.('Connecting to AI model...');
+    const tryOnUrl = await runKolorsTryOn(personFile, garmentUrl, onStatus);
+    if (!tryOnUrl) throw new Error('No result URL from Kolors');
+    onStatus?.('Preparing image...');
+    const blobUrl = await toBlobUrl(tryOnUrl);
+    onStatus?.('Done!');
+    return blobUrl;
+  } catch (err) {
+    console.warn('[TryOn] Kolors failed:', err.message);
+    onStatus?.('Trying fallback model...');
+  }
+
+  // Fallback: Leffa
+  try {
+    const tryOnUrl = await runLeffaTryOn(personFile, garmentUrl, onStatus);
+    if (!tryOnUrl) throw new Error('No result URL from Leffa');
+    onStatus?.('Preparing image...');
+    const blobUrl = await toBlobUrl(tryOnUrl);
+    onStatus?.('Done!');
+    return blobUrl;
+  } catch (err) {
+    throw new Error(`All try-on models failed. Last error: ${err.message}`);
+  }
 }
