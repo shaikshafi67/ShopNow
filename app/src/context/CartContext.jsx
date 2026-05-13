@@ -1,7 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
-import { read, write, remove } from '../utils/storage';
 
 const CartContext = createContext(null);
 export function useCart() {
@@ -9,8 +8,6 @@ export function useCart() {
   if (!ctx) throw new Error('useCart must be used within CartProvider');
   return ctx;
 }
-
-const guestKey = () => 'cart:guest';
 
 // Convert DB row → app cart item shape
 const toItem = (row, product) => ({
@@ -32,110 +29,71 @@ export function CartProvider({ children }) {
   const { user } = useAuth();
   const [items, setItems] = useState([]);
 
-  // Load cart — Supabase for logged-in, localStorage for guest
+  // Load cart from Supabase — only for logged-in users
   const load = useCallback(async () => {
-    if (user) {
-      const { data } = await supabase
-        .from('cart_items')
-        .select('*, products(*)')
-        .eq('user_id', user.id);
-
-      setItems((data ?? []).map(row => toItem(row, row.products ? {
-        ...row.products,
-        price:         Number(row.products.price),
-        originalPrice: Number(row.products.original_price),
-        freeShipping:  row.products.free_shipping,
-      } : null)));
-    } else {
-      setItems(read(guestKey(), []));
-    }
+    if (!user) { setItems([]); return; }
+    const { data } = await supabase
+      .from('cart_items')
+      .select('*, products(*)')
+      .eq('user_id', user.id);
+    setItems((data ?? []).map(row => toItem(row, row.products ? {
+      ...row.products,
+      price:         Number(row.products.price),
+      originalPrice: Number(row.products.original_price),
+      freeShipping:  row.products.free_shipping,
+    } : null)));
   }, [user]);
 
   useEffect(() => { load(); }, [load]);
 
   const add = useCallback(async (product, { size = null, color = 0, qty = 1 } = {}) => {
-    if (user) {
-      const { data: existing } = await supabase
-        .from('cart_items')
-        .select('id, qty')
-        .eq('user_id', user.id)
-        .eq('product_id', product.id)
-        .eq('size', size ?? '')
-        .eq('color_index', color)
-        .maybeSingle();
+    if (!user) return; // must be logged in
+    const { data: existing } = await supabase
+      .from('cart_items')
+      .select('id, qty')
+      .eq('user_id', user.id)
+      .eq('product_id', product.id)
+      .eq('size', size ?? '')
+      .eq('color_index', color)
+      .maybeSingle();
 
-      if (existing) {
-        await supabase.from('cart_items')
-          .update({ qty: Math.min(99, existing.qty + qty) })
-          .eq('id', existing.id);
-      } else {
-        await supabase.from('cart_items').insert({
-          user_id: user.id, product_id: product.id,
-          qty, size: size ?? null, color_index: color,
-        });
-      }
-      await load();
+    if (existing) {
+      await supabase.from('cart_items')
+        .update({ qty: Math.min(99, existing.qty + qty) })
+        .eq('id', existing.id);
     } else {
-      setItems(prev => {
-        const k  = `${product.id}::${size ?? ''}::${color}`;
-        const ex = prev.find(i => i._key === k);
-        const next = ex
-          ? prev.map(i => i._key === k ? { ...i, qty: Math.min(99, i.qty + qty) } : i)
-          : [...prev, {
-              _key: k, productId: product.id, name: product.name,
-              price: product.price, originalPrice: product.originalPrice,
-              image: product.images?.[color] ?? product.images?.[0],
-              size, color, colorHex: product.colors?.[color] ?? null,
-              freeShipping: product.freeShipping ?? false,
-              qty, addedAt: new Date().toISOString(),
-            }];
-        write(guestKey(), next);
-        return next;
+      await supabase.from('cart_items').insert({
+        user_id: user.id, product_id: product.id,
+        qty, size: size ?? null, color_index: color,
       });
     }
+    await load();
   }, [user, load]);
 
   const updateQty = useCallback(async (key, qty) => {
-    if (user) {
-      const item = items.find(i => i._key === key);
-      if (!item) return;
-      await supabase.from('cart_items')
-        .update({ qty: Math.max(1, Math.min(99, qty)) })
-        .eq('user_id', user.id).eq('product_id', item.productId)
-        .eq('size', item.size ?? null).eq('color_index', item.color);
-      await load();
-    } else {
-      setItems(prev => {
-        const next = prev.map(i => i._key === key ? { ...i, qty: Math.max(1, Math.min(99, qty)) } : i);
-        write(guestKey(), next);
-        return next;
-      });
-    }
+    if (!user) return;
+    const item = items.find(i => i._key === key);
+    if (!item) return;
+    await supabase.from('cart_items')
+      .update({ qty: Math.max(1, Math.min(99, qty)) })
+      .eq('user_id', user.id).eq('product_id', item.productId)
+      .eq('size', item.size ?? null).eq('color_index', item.color);
+    await load();
   }, [user, items, load]);
 
   const removeItem = useCallback(async (key) => {
-    if (user) {
-      const item = items.find(i => i._key === key);
-      if (!item) return;
-      await supabase.from('cart_items')
-        .delete().eq('user_id', user.id).eq('product_id', item.productId)
-        .eq('color_index', item.color);
-      await load();
-    } else {
-      setItems(prev => {
-        const next = prev.filter(i => i._key !== key);
-        write(guestKey(), next);
-        return next;
-      });
-    }
+    if (!user) return;
+    const item = items.find(i => i._key === key);
+    if (!item) return;
+    await supabase.from('cart_items')
+      .delete().eq('user_id', user.id).eq('product_id', item.productId)
+      .eq('color_index', item.color);
+    await load();
   }, [user, items, load]);
 
   const clear = useCallback(async () => {
-    if (user) {
-      await supabase.from('cart_items').delete().eq('user_id', user.id);
-    } else {
-      remove(guestKey());
-    }
+    if (!user) return;
+    await supabase.from('cart_items').delete().eq('user_id', user.id);
     setItems([]);
   }, [user]);
 

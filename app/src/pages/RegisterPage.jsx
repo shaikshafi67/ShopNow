@@ -101,16 +101,26 @@ export default function RegisterPage() {
   };
 
   const sendOTP = async () => {
-    const res  = await fetch(`${API}/api/send-otp`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ email: form.email, name: form.name }),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success) throw new Error(data.error || 'Failed to send OTP');
-    setEmailSent(data.sent);       // true = real email sent
-    setDemoOtp(data.otp || '');    // only present in demo mode
-    setCooldown(60);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+    try {
+      const res = await fetch(`${API}/api/send-otp`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ email: form.email, name: form.name }),
+        signal:  controller.signal,
+      });
+      clearTimeout(timeout);
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Failed to send OTP');
+      setEmailSent(data.sent);
+      setDemoOtp(data.otp || '');
+      setCooldown(60);
+    } catch (err) {
+      clearTimeout(timeout);
+      if (err.name === 'AbortError') throw new Error('Server not reachable. Please try again later.');
+      throw err;
+    }
   };
 
   /* ── Step 2: Verify OTP via server, then create Firebase account ── */

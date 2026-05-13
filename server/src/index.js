@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
 import Razorpay from 'razorpay';
@@ -8,6 +8,8 @@ import { fileURLToPath } from 'url';
 import nodemailer from 'nodemailer';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Load .env from server/ folder regardless of where process starts
+dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const app  = express();
 const PORT = process.env.PORT || 3001;

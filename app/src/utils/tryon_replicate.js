@@ -1,7 +1,7 @@
 /**
  * tryon_replicate.js  —  Virtual Try-On via Replicate (IDM-VTON)
  *
- * Replicate hosts IDM-VTON — same model as HuggingFace but more reliable.
+ * Replicate hosts IDM-VTON (cuuupid/idm-vton) — same model as HuggingFace but more reliable.
  * Free tier: ~$0.00115 per run, new accounts get $5 free credit (~4000 try-ons).
  *
  * Setup:
@@ -18,14 +18,15 @@ const API = '/replicate';
 async function fileToBase64(file) {
   return new Promise((res, rej) => {
     const r = new FileReader();
-    r.onload  = () => res(r.result);
+    r.onload = () => res(r.result);
     r.onerror = rej;
     r.readAsDataURL(file);
   });
 }
 
+
 async function urlToBase64(url) {
-  const abs  = url.startsWith('http') ? url : `${location.origin}${url}`;
+  const abs = url.startsWith('http') ? url : `${location.origin}${url}`;
   const blob = await fetch(abs).then(r => r.blob());
   return fileToBase64(blob);
 }
@@ -45,10 +46,24 @@ export async function runReplicateTryOn({ personFile, garmentUrl, onStatus }) {
     urlToBase64(garmentUrl),
   ]);
 
+  onStatus?.('Getting model version from Replicate…');
+
+  // ── Step 1: Fetch latest version hash for cuuupid/idm-vton ───────────────
+  const modelResp = await fetch(`${API}/models/cuuupid/idm-vton`, {
+    headers: { 'Authorization': `Bearer ${REPLICATE_TOKEN}` },
+  });
+  if (!modelResp.ok) {
+    const e = await modelResp.json().catch(() => ({}));
+    throw new Error(`Replicate model fetch failed (${modelResp.status}): ${e.detail || modelResp.statusText}`);
+  }
+  const modelData = await modelResp.json();
+  const version = modelData.latest_version?.id;
+  if (!version) throw new Error('Could not resolve cuuupid/idm-vton version from Replicate');
+
   onStatus?.('Submitting to Replicate IDM-VTON…');
 
-  // ── Create prediction ─────────────────────────────────────────────────────
-  const createResp = await fetch(`${API}/models/yisol/idm-vton/predictions`, {
+  // ── Step 2: Create prediction using the version hash ─────────────────────
+  const createResp = await fetch(`${API}/predictions`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${REPLICATE_TOKEN}`,
@@ -56,21 +71,22 @@ export async function runReplicateTryOn({ personFile, garmentUrl, onStatus }) {
       'Prefer': 'wait=30',
     },
     body: JSON.stringify({
+      version,
       input: {
-        human_img:     humanB64,
-        garm_img:      garmentB64,
-        garment_des:   'clothing',
-        is_checked:    true,
+        human_img: humanB64,
+        garm_img: garmentB64,
+        garment_des: 'clothing',
+        is_checked: true,
         is_checked_crop: true,
         denoise_steps: 30,
-        seed:          42,
+        seed: 42,
       },
     }),
   });
 
   if (!createResp.ok) {
     const err = await createResp.json().catch(() => ({}));
-    throw new Error(`Replicate error: ${err.detail || createResp.statusText}`);
+    throw new Error(`Replicate error (${createResp.status}): ${JSON.stringify(err.detail || err)}`);
   }
 
   let prediction = await createResp.json();

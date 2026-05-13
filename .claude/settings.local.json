@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s 'https://ptgnbqriunandgwgtvdf.supabase.co/rest/v1/products?select=name&limit=2' -H 'apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB0Z25icXJpdW5hbmRnd2d0dmRmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgwNTg0MzEsImV4cCI6MjA5MzYzNDQzMX0.JSBTkxZQMLPyH33Ofrfu8BlEXqCq723q9C1VpJv71uk')"
+    ]
+  }
+}
