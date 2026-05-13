@@ -7,9 +7,9 @@ import AuthShell, { FormField } from '../components/AuthShell';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
-const EJS_SERVICE  = import.meta.env.VITE_EMAILJS_SERVICE_ID;
-const EJS_TEMPLATE = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
-const EJS_KEY      = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
+const EJS_SERVICE  = import.meta.env.VITE_EMAILJS_SERVICE_ID  || 'service_xsgnw7h';
+const EJS_TEMPLATE = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || 'template_2mwda9c';
+const EJS_KEY      = import.meta.env.VITE_EMAILJS_PUBLIC_KEY  || 'T2-4H9KjfD2y43Vz9';
 
 /* ── 6-box OTP Input ─────────────────────────────────────────────────── */
 function OTPInput({ value, onChange }) {
@@ -103,12 +103,17 @@ export default function RegisterPage() {
 
   const sendOTP = async () => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    otpRef.current = otp; // store in memory only
-    await emailjs.send(
-      EJS_SERVICE, EJS_TEMPLATE,
-      { to_name: form.name, to_email: form.email, otp },
-      { publicKey: EJS_KEY }
-    );
+    otpRef.current = otp; // store in memory only — never shown on screen
+    try {
+      await emailjs.send(
+        EJS_SERVICE, EJS_TEMPLATE,
+        { to_name: form.name, to_email: form.email, otp },
+        { publicKey: EJS_KEY }
+      );
+    } catch (err) {
+      console.error('[EmailJS] send failed:', err);
+      throw new Error('Failed to send verification email. Please try again.');
+    }
     setCooldown(60);
   };
 
