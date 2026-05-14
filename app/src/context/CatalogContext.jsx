@@ -24,7 +24,8 @@ const toApp = (p) => ({
   images:        Array.isArray(p.images) ? p.images : [],
   colors:        Array.isArray(p.colors) ? p.colors : [],
   sizes:         Array.isArray(p.sizes)  ? p.sizes  : [],
-  colorVariants: Array.isArray(p.color_variants) ? p.color_variants : [],
+  colorVariants:    Array.isArray(p.color_variants) ? p.color_variants : [],
+  colorDisplayMode: p.color_display_mode ?? 'swatch',
   stock:         p.stock,
   tryOnReady:    p.try_on_ready,
   freeShipping:  p.free_shipping,
@@ -56,7 +57,8 @@ const toDB = (p) => ({
   width:          p.dimensions?.width  ? parseFloat(p.dimensions.width)  : null,
   height:         p.dimensions?.height ? parseFloat(p.dimensions.height) : null,
   sku:            p.sku ?? null,
-  color_variants: Array.isArray(p.colorVariants) ? p.colorVariants : [],
+  color_variants:      Array.isArray(p.colorVariants) ? p.colorVariants : [],
+  color_display_mode: p.colorDisplayMode ?? 'swatch',
   is_active:      p.status !== 'draft' && p.availability !== 'draft' && p.isActive !== false,
 });
 

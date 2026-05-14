@@ -39,6 +39,39 @@ export default function ProductPage() {
     } catch { return false; }
   });
 
+  // ── All hooks must be called before any early return (Rules of Hooks) ──────
+  const colorSizeData = useMemo(() => {
+    const cv = product?.colorVariants?.[selectedColor];
+    if (!cv?.sizeVariants?.length) return null;
+    const map = {};
+    cv.sizeVariants.forEach(sv => { map[sv.size] = sv; });
+    return map;
+  }, [product, selectedColor]);
+
+  const colorSizeStock = useMemo(() => {
+    if (!colorSizeData) return null;
+    const map = {};
+    Object.entries(colorSizeData).forEach(([s, sv]) => { map[s] = sv.stock; });
+    return map;
+  }, [colorSizeData]);
+
+  const selectedSizePrice = useMemo(() => {
+    if (!selectedSize || !product) return null;
+    if (colorSizeData) {
+      const sv = colorSizeData[selectedSize];
+      if (sv?.price && sv.price !== product.price) return sv.price;
+    }
+    const gv = product.variants?.find(v => v.size === selectedSize);
+    if (gv?.price && gv.price !== product.price) return gv.price;
+    return null;
+  }, [colorSizeData, selectedSize, product]);
+
+  const colorHasAnyStock = useMemo(() => {
+    if (!colorSizeStock) return null;
+    return Object.values(colorSizeStock).some(s => s > 0);
+  }, [colorSizeStock]);
+
+  // ── Early return after all hooks ─────────────────────────────────────────
   if (!product) {
     return (
       <div style={{ paddingTop: 120, textAlign: 'center', minHeight: '100vh' }}>
@@ -50,45 +83,9 @@ export default function ProductPage() {
 
   const wished = has(product.id);
   const similar = products.filter((p) => p.id !== id && p.category === product.category).slice(0, 4);
-  // Per-color per-size data from selected color's sizeVariants
-  const colorSizeData = useMemo(() => {
-    const cv = product.colorVariants?.[selectedColor];
-    if (!cv?.sizeVariants?.length) return null;
-    const map = {};
-    cv.sizeVariants.forEach(sv => { map[sv.size] = sv; }); // { size → { size, price, stock, sku } }
-    return map;
-  }, [product.colorVariants, selectedColor]);
-
-  // Convenience: just stock per size
-  const colorSizeStock = useMemo(() => {
-    if (!colorSizeData) return null;
-    const map = {};
-    Object.entries(colorSizeData).forEach(([s, sv]) => { map[s] = sv.stock; });
-    return map;
-  }, [colorSizeData]);
-
-  // Price for the currently selected size (per-color sizeVariants OR global variants)
-  const selectedSizePrice = useMemo(() => {
-    if (!selectedSize) return null;
-    // 1. Per-color sizeVariants (multi-color products)
-    if (colorSizeData) {
-      const sv = colorSizeData[selectedSize];
-      if (sv?.price && sv.price !== product.price) return sv.price;
-    }
-    // 2. Global variants (single-color products)
-    const gv = product.variants?.find(v => v.size === selectedSize);
-    if (gv?.price && gv.price !== product.price) return gv.price;
-    return null;
-  }, [colorSizeData, selectedSize, product.price, product.variants]);
-
-  // Out-of-stock: if selected color has sizeVariants, check if ANY size has stock
-  const colorHasAnyStock = useMemo(() => {
-    if (!colorSizeStock) return null; // unknown, rely on global
-    return Object.values(colorSizeStock).some(s => s > 0);
-  }, [colorSizeStock]);
 
   const outOfStock = colorHasAnyStock !== null
-    ? !colorHasAnyStock // use per-color stock
+    ? !colorHasAnyStock
     : (product.stock === 0
        || product.availability === 'out_of_stock'
        || product.availability === 'Out of Stock');
