@@ -18,7 +18,7 @@ const FEATURES = [
   { icon: Sparkles, label: '3D Try-On',      desc: 'See any outfit on you before buying.',    color: '#7c6aff' },
   { icon: Zap,      label: 'AI Sizing',       desc: 'Perfect fit recommended every time.',     color: '#3b82f6' },
   { icon: Shield,   label: 'Premium Quality', desc: 'Every item quality-checked by stylists.', color: '#10b981' },
-  { icon: RotateCcw,label: 'Easy Returns',    desc: 'Free 30-day returns, zero hassle.',       color: '#ff6a9a' },
+  { icon: RotateCcw,label: 'Easy Returns',    desc: 'Free 7-day returns, zero hassle.',       color: '#ff6a9a' },
   { icon: Truck,    label: 'Fast Delivery',   desc: 'Ships in 24hrs, tracked to your door.',   color: '#f59e0b' },
   { icon: Star,     label: '4.9★ Rated',      desc: 'Loved by 2M+ customers.',                color: '#ef4444' },
 ];
@@ -709,7 +709,7 @@ export default function HomePage() {
           <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 0 }}>
             {[
               { icon: Truck,     label: 'Free Shipping',  sub: 'On orders above ₹999' },
-              { icon: RotateCcw, label: '30-Day Returns', sub: 'No questions asked'   },
+              { icon: RotateCcw, label: '7-Day Returns',  sub: 'No questions asked'   },
               { icon: Shield,    label: 'Secure Payment', sub: '100% safe checkout'   },
               { icon: Sparkles,  label: '3D Try-On',      sub: 'Before you buy'       },
             ].map((item, i, arr) => (

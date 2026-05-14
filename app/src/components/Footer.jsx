@@ -91,17 +91,17 @@ export default function Footer() {
               marginBottom: 24,
               lineHeight: 1.6,
             }}>
-              {brandName} – Women Fashion Trendy &amp; affordable styles
+              {brandName} – Fashion Trendy &amp; affordable styles
             </p>
 
             {/* Contact */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 28 }}>
               <p style={{ fontSize: 14, color: 'var(--text-secondary)', margin: 0 }}>India</p>
               <p style={{ fontSize: 14, color: 'var(--text-secondary)', margin: 0 }}>
-                Phone: <strong style={{ color: 'var(--text-primary)' }}>9173063820</strong>
+                Phone: <strong style={{ color: 'var(--text-primary)' }}>7201030522</strong>
               </p>
               <p style={{ fontSize: 14, color: 'var(--text-secondary)', margin: 0 }}>
-                Email: <strong style={{ color: 'var(--text-primary)' }}>support@shopnow.in</strong>
+                Email: <strong style={{ color: 'var(--text-primary)' }}>support7766@gmail.com</strong>
               </p>
             </div>
 
