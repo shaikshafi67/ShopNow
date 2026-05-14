@@ -33,11 +33,14 @@ export function CollectionsProvider({ children }) {
   useEffect(() => { load(); }, [load]);
 
   const addCollection = useCallback(async (col) => {
+    const name = col.name ?? col.title ?? '';
+    const slug = col.slug ?? name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || `col-${Date.now()}`;
     const { data, error } = await supabase.from('collections').insert({
-      name: col.name, slug: col.slug, description: col.description ?? '',
+      name, slug, description: col.description ?? '',
       image: col.image ?? null, is_auto: col.isAuto ?? false,
       auto_category: col.autoCategory ?? null,
-      is_active: col.isActive !== false, sort_order: collections.length,
+      is_active: col.isActive ?? col.active ?? true,
+      sort_order: collections.length,
     }).select().single();
     if (error) throw new Error(error.message);
     const c = toApp(data);

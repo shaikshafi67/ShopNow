@@ -380,19 +380,23 @@ export default function AdminCollections() {
     toast.info(`${total} collection${total > 1 ? 's' : ''} deleted`);
   }
 
-  function handleSave(form) {
-    if (form.auto) {
-      if (form.image) setAutoImage(form.title, form.image);
-      setAutoExclusion(form.title, form.excludedIds || []);
-      toast.success('Collection saved! Changes visible on homepage.');
-    } else if (form.id) {
-      updateCustom(form.id, form);
-      toast.success('Collection updated');
-    } else {
-      addCustom(form);
-      toast.success('Collection created');
+  async function handleSave(form) {
+    try {
+      if (form.auto) {
+        if (form.image) setAutoImage(form.title, form.image);
+        setAutoExclusion(form.title, form.excludedIds || []);
+        toast.success('Collection saved! Changes visible on homepage.');
+      } else if (form.id) {
+        await updateCustom(form.id, form);
+        toast.success('Collection updated');
+      } else {
+        await addCustom(form);
+        toast.success('Collection created');
+      }
+      setSelected(null);
+    } catch (err) {
+      toast.error(err.message || 'Failed to save collection');
     }
-    setSelected(null);
   }
 
   function openNew() {
