@@ -447,11 +447,27 @@ export default function AdminAddProduct() {
     try {
       const tempId = `p_${Date.now()}`;
 
-      // Upload all data-URL images to Supabase Storage first
+      // Upload main Media tab images
       const uploadedImages = await Promise.all(
         form.images.map(img => uploadIfNeeded(img, tempId))
       );
       const finalImages = uploadedImages.filter(Boolean);
+
+      // Upload per-color variant images
+      const uploadedColorVariants = await Promise.all(
+        form.colorVariants.map(async (cv) => {
+          const uploadedCvImages = await Promise.all(
+            (cv.images || []).map(img => uploadIfNeeded(img, tempId))
+          );
+          return { ...cv, images: uploadedCvImages.filter(Boolean) };
+        })
+      );
+
+      // If no main images but color variants have images, use first color's first image
+      if (finalImages.length === 0 && uploadedColorVariants.length > 0) {
+        const firstImg = uploadedColorVariants[0]?.images?.[0];
+        if (firstImg) finalImages.push(firstImg);
+      }
 
       const mrp = parseFloat(form.mrp)          || 0;
       const sp  = parseFloat(form.sellingPrice)  || 0;
@@ -469,25 +485,25 @@ export default function AdminAddProduct() {
         costPrice:       parseFloat(form.costPrice) || 0,
         sku:             form.sku,
         // Stock: auto-sum from all color+size variants if colors exist, else manual
-        stock: form.colorVariants.length > 0
-          ? form.colorVariants.reduce((total, cv) =>
+        stock: uploadedColorVariants.length > 0
+          ? uploadedColorVariants.reduce((total, cv) =>
               total + (cv.sizeVariants || []).reduce((sum, sv) => sum + (Number(sv.stock) || 0), 0), 0)
           : parseInt(form.stock, 10) || 0,
         lowStockAlert:   parseInt(form.lowStockAlert, 10) || 5,
         availability:    form.availability,
-        // Media tab images — already uploaded to Supabase Storage
         images:          finalImages,
-        // Sizes: from color sizeVariants when colors exist, else from global variants
-        sizes: form.colorVariants.length > 0
-          ? [...new Set(form.colorVariants.flatMap(cv => (cv.sizeVariants || []).map(sv => sv.size)).filter(Boolean))]
+        sizes: uploadedColorVariants.length > 0
+          ? [...new Set(uploadedColorVariants.flatMap(cv => (cv.sizeVariants || []).map(sv => sv.size)).filter(Boolean))]
           : [...new Set(form.variants.map(v => v.size).filter(Boolean))],
-        variants: form.colorVariants.length === 0
+        variants: uploadedColorVariants.length === 0
           ? form.variants.map(v => ({ ...v, price: parseFloat(v.price) || sp, stock: parseInt(v.stock, 10) || 0 }))
           : [], // replaced by colorVariants.sizeVariants
-        colors:          form.colorVariants.map(cv => cv.hex).filter(Boolean),
-        colorVariants:   form.colorVariants.map(cv => ({
-          ...cv,
-          images: cv.images || [],
+        colors:          uploadedColorVariants.map(cv => cv.hex).filter(Boolean),
+        colorVariants:   uploadedColorVariants.map(cv => ({
+          id:           cv.id,
+          name:         cv.name,
+          hex:          cv.hex,
+          images:       cv.images || [],
           sizeVariants: (cv.sizeVariants || []).map(sv => ({ ...sv, stock: Number(sv.stock) || 0 })),
         })),
         colorDisplayMode: form.colorDisplayMode || 'swatch',
