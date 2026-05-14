@@ -117,8 +117,9 @@ export function CatalogProvider({ children }) {
 
   const uploadProductImage = useCallback(async (file, productId) => {
     const ext  = file.name.split('.').pop();
-    const path = `${productId}/${Date.now()}.${ext}`;
-    const { error } = await supabase.storage.from('products').upload(path, file, { upsert: true });
+    const uid  = `${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
+    const path = `${productId}/${uid}.${ext}`;
+    const { error } = await supabase.storage.from('products').upload(path, file, { upsert: false });
     if (error) throw new Error(error.message);
     const { data: { publicUrl } } = supabase.storage.from('products').getPublicUrl(path);
     return publicUrl;

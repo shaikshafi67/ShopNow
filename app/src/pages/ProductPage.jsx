@@ -490,7 +490,7 @@ export default function ProductPage() {
               {product.description && (
                 <div style={{ marginTop: 22, padding: '14px 16px', background: 'var(--bg-glass)', border: '1px solid var(--border-glass)', borderRadius: 12 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>Description</div>
-                  <p style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--text-secondary)' }}>{product.description}</p>
+                  <p style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--text-secondary)', whiteSpace: 'pre-line' }}>{product.description}</p>
                 </div>
               )}
             </motion.div>
