@@ -1,7 +1,7 @@
-import { useRef, useState, useMemo, useEffect, useCallback } from 'react';
+import { useRef, useState, useMemo } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, MapPin, CreditCard, ChevronRight, Truck, Lock, Tag, X as XIcon, Package, ShoppingBag, Star } from 'lucide-react';
+import { CheckCircle, MapPin, CreditCard, ChevronRight, Truck, Lock, Tag, X as XIcon } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useOrders } from '../context/OrdersContext';
@@ -25,7 +25,6 @@ export default function CheckoutPage() {
   const [couponInput, setCouponInput] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponError, setCouponError] = useState('');
-  const [orderSuccess, setOrderSuccess] = useState(null); // { order, paymentData }
 
   const couponDiscount = appliedCoupon?.amount || 0;
   const isCouponFreeShipping = appliedCoupon?.freeShipping || false;
@@ -121,7 +120,7 @@ export default function CheckoutPage() {
     handlePaymentSuccess({ method: 'cod', status: 'pending', txnId, gateway: 'cod' });
   };
 
-  const handlePaymentSuccess = (paymentData) => {
+  const handlePaymentSuccess = async (paymentData) => {
     setRazorpayOpen(false);
     orderPlaced.current = true;
 
@@ -129,7 +128,8 @@ export default function CheckoutPage() {
       incrementUsed(appliedCoupon.discount.id);
     }
 
-    const order = placeOrder({
+    // placeOrder is async — await it to get the real DB id
+    const order = await placeOrder({
       items,
       totals: finalTotals,
       address: selectedAddress,
@@ -138,42 +138,24 @@ export default function CheckoutPage() {
     items.forEach((it) => decrementStock(it.productId, it.qty));
     clear();
 
+    // Push notification to Supabase so the bell icon shows it
     notif.add({
-      title: 'Order Placed!',
-      body: `Your order ${order.number} has been placed successfully. Total: ${inr(order.totals.total)}.`,
+      title: '🎉 Order Placed!',
+      body: `Your order ${order.number} is confirmed. Total: ${inr(order.totals?.total ?? finalTotals.total)}. ${paymentData.method === 'cod' ? 'Pay on delivery.' : 'Payment received.'}`,
       type: 'order',
-      link: `/orders/${order.id}`,
+      link: `/order-confirmed/${order.id}`,
     });
 
-    // Show celebration overlay instead of immediately navigating
-    setOrderSuccess({ order, paymentData, finalTotals });
-  };
-
-  // Auto-redirect after success overlay
-  const handleSuccessComplete = useCallback(() => {
-    navigate('/orders', {
+    // Navigate directly to the dedicated confirmation page
+    navigate(`/order-confirmed/${order.id}`, {
       replace: true,
       state: {
-        justPlaced: true,
-        orderId: orderSuccess?.order?.id,
-        orderNumber: orderSuccess?.order?.number,
-        paymentMethod: orderSuccess?.paymentData?.method,
-        total: orderSuccess?.finalTotals?.total,
+        orderNumber: order.number,
+        paymentMethod: paymentData.method,
+        total: finalTotals.total,
       },
     });
-  }, [navigate, orderSuccess]);
-
-  // Show order success overlay
-  if (orderSuccess) {
-    return (
-      <OrderSuccessOverlay
-        order={orderSuccess.order}
-        paymentData={orderSuccess.paymentData}
-        finalTotals={orderSuccess.finalTotals}
-        onComplete={handleSuccessComplete}
-      />
-    );
-  }
+  };
 
   return (
     <div style={{ paddingTop: 'var(--nav-height)', minHeight: '100vh' }}>

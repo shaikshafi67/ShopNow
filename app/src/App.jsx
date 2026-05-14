@@ -21,6 +21,7 @@ import OrdersPage from './pages/OrdersPage';
 import OrderDetailPage from './pages/OrderDetailPage';
 import CheckoutPage from './pages/CheckoutPage';
 import NotificationsPage from './pages/NotificationsPage';
+import OrderConfirmedPage from './pages/OrderConfirmedPage';
 import RequireAuth from './components/RequireAuth';
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -106,6 +107,7 @@ function AppRoutes() {
           <Route path="/orders" element={<RequireAuth><PageWrapper><OrdersPage /></PageWrapper></RequireAuth>} />
           <Route path="/orders/:id" element={<RequireAuth><PageWrapper><OrderDetailPage /></PageWrapper></RequireAuth>} />
           <Route path="/checkout" element={<RequireAuth><PageWrapper><CheckoutPage /></PageWrapper></RequireAuth>} />
+          <Route path="/order-confirmed/:id" element={<RequireAuth><PageWrapper><OrderConfirmedPage /></PageWrapper></RequireAuth>} />
 
           {/* Admin */}
           <Route path="/admin" element={<RequireAuth role="admin"><AdminLayout /></RequireAuth>}>
