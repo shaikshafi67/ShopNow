@@ -80,8 +80,30 @@ function buildUser(fbUser, profile) {
 
 // ── Provider ──────────────────────────────────────────────────────────────
 export function AuthProvider({ children }) {
-  const [user, setUser]       = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser]         = useState(null);
+  const [loading, setLoading]   = useState(true);
+  const [allUsers, setAllUsers] = useState([]);
+
+  // ── Fetch all users from Supabase (admin only) ─────────────────────────
+  const fetchAllUsers = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, firebase_uid, email, name, phone, role, created_at')
+      .order('created_at', { ascending: false });
+    if (!error && data) {
+      setAllUsers(data.map(p => ({
+        id:        p.id,
+        uid:       p.firebase_uid,
+        email:     p.email  ?? '',
+        name:      p.name   ?? '',
+        phone:     p.phone  ?? '',
+        role:      p.role   ?? 'user',
+        createdAt: p.created_at,
+      })));
+    } else if (error) {
+      console.error('[Auth] fetchAllUsers error:', error.message);
+    }
+  }, []);
 
   // Listen to Firebase auth state changes
   useEffect(() => {
@@ -202,7 +224,8 @@ export function AuthProvider({ children }) {
       login, register, logout, resendVerification,
       updateUser, updateProfile: updateUser,
       addAddress, removeAddress, resetPassword,
-      allUsers: [], findByEmail: () => null,
+      allUsers, fetchAllUsers,
+      findByEmail: (email) => allUsers.find(u => u.email === email) ?? null,
     }}>
       {children}
     </AuthContext.Provider>

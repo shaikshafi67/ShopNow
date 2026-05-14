@@ -5,29 +5,24 @@ import { useAuth } from '../../context/AuthContext';
 import { useOrders } from '../../context/OrdersContext';
 import { useToast } from '../../context/ToastContext';
 import { shortDate, inr } from '../../utils/format';
-import { read } from '../../utils/storage';
 
 export default function AdminUsers() {
-  const { allUsers, user: currentUser } = useAuth();
+  const { allUsers, fetchAllUsers, user: currentUser } = useAuth();
   const { orders } = useOrders();
   const toast = useToast();
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [loading, setLoading] = useState(false);
 
-  // Force re-read from localStorage on mount and on manual refresh
-  const [liveUsers, setLiveUsers] = useState(() => {
-    const stored = read('users', null);
-    return stored && Array.isArray(stored) ? stored : allUsers;
-  });
-
+  // Fetch users from Supabase on mount
   useEffect(() => {
-    const stored = read('users', null);
-    if (stored && Array.isArray(stored)) setLiveUsers(stored);
-  }, [refreshKey, allUsers]);
+    setLoading(true);
+    fetchAllUsers().finally(() => setLoading(false));
+  }, [fetchAllUsers]);
 
-  const handleRefresh = () => {
-    const stored = read('users', null);
-    if (stored && Array.isArray(stored)) { setLiveUsers(stored); setRefreshKey(k => k + 1); }
-    toast.success(`Refreshed — ${stored?.length || 0} users loaded`);
+  const handleRefresh = async () => {
+    setLoading(true);
+    await fetchAllUsers();
+    setLoading(false);
+    toast.success(`Refreshed — ${allUsers.length} users loaded`);
   };
 
   const [search, setSearch] = useState('');
@@ -35,7 +30,7 @@ export default function AdminUsers() {
   const [expandedId, setExpandedId] = useState(null);
 
   const filtered = useMemo(() => {
-    let list = liveUsers;
+    let list = allUsers;
     if (roleFilter !== 'all') list = list.filter((u) => u.role === roleFilter);
     if (search) {
       const q = search.toLowerCase();
@@ -45,7 +40,7 @@ export default function AdminUsers() {
       );
     }
     return list;
-  }, [liveUsers, search, roleFilter]);
+  }, [allUsers, search, roleFilter]);
 
   const userOrders = useMemo(() => {
     const map = {};
@@ -63,22 +58,22 @@ export default function AdminUsers() {
         <div>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 800, marginBottom: 4 }}>Users</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
-            {liveUsers.length} registered user{liveUsers.length !== 1 ? 's' : ''} ·{' '}
-            {liveUsers.filter((u) => u.role === 'admin').length} admin{liveUsers.filter((u) => u.role === 'admin').length !== 1 ? 's' : ''}
+            {allUsers.length} registered user{allUsers.length !== 1 ? 's' : ''} ·{' '}
+            {allUsers.filter((u) => u.role === 'admin').length} admin{allUsers.filter((u) => u.role === 'admin').length !== 1 ? 's' : ''}
           </p>
         </div>
-        <button onClick={handleRefresh}
-          style={{ display:'flex', alignItems:'center', gap:7, padding:'9px 16px', borderRadius:8, border:'1px solid var(--border-glass)', background:'var(--bg-glass)', color:'var(--text-secondary)', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'var(--font-body)', flexShrink:0 }}>
-          <RefreshCw size={14} /> Refresh Users
+        <button onClick={handleRefresh} disabled={loading}
+          style={{ display:'flex', alignItems:'center', gap:7, padding:'9px 16px', borderRadius:8, border:'1px solid var(--border-glass)', background:'var(--bg-glass)', color:'var(--text-secondary)', fontSize:13, fontWeight:600, cursor: loading ? 'not-allowed' : 'pointer', fontFamily:'var(--font-body)', flexShrink:0, opacity: loading ? 0.6 : 1 }}>
+          <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} /> {loading ? 'Loading...' : 'Refresh Users'}
         </button>
       </div>
 
       {/* Quick stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12, marginBottom: 20 }}>
         {[
-          { label: 'Total Users', value: liveUsers.length, icon: UserCog, color: '#7c6aff' },
-          { label: 'Admins', value: liveUsers.filter((u) => u.role === 'admin').length, icon: ShieldCheck, color: '#f59e0b' },
-          { label: 'Customers', value: liveUsers.filter((u) => u.role === 'user').length, icon: Shield, color: '#3b82f6' },
+          { label: 'Total Users', value: allUsers.length, icon: UserCog, color: '#7c6aff' },
+          { label: 'Admins', value: allUsers.filter((u) => u.role === 'admin').length, icon: ShieldCheck, color: '#f59e0b' },
+          { label: 'Customers', value: allUsers.filter((u) => u.role === 'user').length, icon: Shield, color: '#3b82f6' },
         ].map((s, i) => (
           <motion.div
             key={s.label}
@@ -198,7 +193,9 @@ export default function AdminUsers() {
             </tbody>
           </table>
           {filtered.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>No users found.</div>
+            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
+              {loading ? 'Loading users…' : 'No users found.'}
+            </div>
           )}
         </div>
       </div>
