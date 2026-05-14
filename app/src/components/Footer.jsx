@@ -101,7 +101,7 @@ export default function Footer() {
                 Phone: <strong style={{ color: 'var(--text-primary)' }}>7201030522</strong>
               </p>
               <p style={{ fontSize: 14, color: 'var(--text-secondary)', margin: 0 }}>
-                Email: <strong style={{ color: 'var(--text-primary)' }}>support7766@gmail.com</strong>
+                Email: <strong style={{ color: 'var(--text-primary)' }}>shopnow7766@gmail.com</strong>
               </p>
             </div>
 
