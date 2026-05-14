@@ -1,7 +1,7 @@
-import { useRef, useState, useMemo } from 'react';
+import { useRef, useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, MapPin, CreditCard, ChevronRight, Truck, Lock, Tag, X as XIcon } from 'lucide-react';
+import { CheckCircle, MapPin, CreditCard, ChevronRight, Truck, Lock, Tag, X as XIcon, Package, ShoppingBag, Star } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useOrders } from '../context/OrdersContext';
@@ -23,8 +23,9 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
 
   const [couponInput, setCouponInput] = useState('');
-  const [appliedCoupon, setAppliedCoupon] = useState(null); // { discount, amount }
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponError, setCouponError] = useState('');
+  const [orderSuccess, setOrderSuccess] = useState(null); // { order, paymentData }
 
   const couponDiscount = appliedCoupon?.amount || 0;
   const isCouponFreeShipping = appliedCoupon?.freeShipping || false;
@@ -122,7 +123,6 @@ export default function CheckoutPage() {
 
   const handlePaymentSuccess = (paymentData) => {
     setRazorpayOpen(false);
-    // Must be set before clear() so the items===0 guard doesn't redirect to /cart
     orderPlaced.current = true;
 
     if (appliedCoupon?.discount?.id) {
@@ -145,17 +145,35 @@ export default function CheckoutPage() {
       link: `/orders/${order.id}`,
     });
 
+    // Show celebration overlay instead of immediately navigating
+    setOrderSuccess({ order, paymentData, finalTotals });
+  };
+
+  // Auto-redirect after success overlay
+  const handleSuccessComplete = useCallback(() => {
     navigate('/orders', {
       replace: true,
       state: {
         justPlaced: true,
-        orderId: order.id,
-        orderNumber: order.number,
-        paymentMethod: paymentData.method,
-        total: finalTotals.total,
+        orderId: orderSuccess?.order?.id,
+        orderNumber: orderSuccess?.order?.number,
+        paymentMethod: orderSuccess?.paymentData?.method,
+        total: orderSuccess?.finalTotals?.total,
       },
     });
-  };
+  }, [navigate, orderSuccess]);
+
+  // Show order success overlay
+  if (orderSuccess) {
+    return (
+      <OrderSuccessOverlay
+        order={orderSuccess.order}
+        paymentData={orderSuccess.paymentData}
+        finalTotals={orderSuccess.finalTotals}
+        onComplete={handleSuccessComplete}
+      />
+    );
+  }
 
   return (
     <div style={{ paddingTop: 'var(--nav-height)', minHeight: '100vh' }}>
@@ -514,5 +532,264 @@ function Field({ value, onChange, placeholder, full }) {
       placeholder={placeholder}
       style={{ ...fieldStyle(), width: '100%', gridColumn: full ? '1 / -1' : 'auto' }}
     />
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🎉  ORDER SUCCESS OVERLAY
+// ─────────────────────────────────────────────────────────────────────────────
+const CONFETTI_COLORS = [
+  '#7c6aff','#ff6a9a','#f59e0b','#22c55e','#3b82f6','#ec4899','#a855f7','#06b6d4'
+];
+
+function Confetti() {
+  const pieces = useMemo(() => {
+    return Array.from({ length: 60 }, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      delay: Math.random() * 1.2,
+      duration: 1.8 + Math.random() * 1.4,
+      color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+      size: 6 + Math.random() * 8,
+      rotate: Math.random() * 360,
+      shape: i % 3,   // 0=square, 1=circle, 2=rect
+    }));
+  }, []);
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 9999, overflow: 'hidden' }}>
+      {pieces.map((p) => (
+        <motion.div
+          key={p.id}
+          initial={{ y: -20, x: `${p.x}vw`, opacity: 1, rotate: p.rotate, scale: 1 }}
+          animate={{ y: '110vh', opacity: [1, 1, 0], rotate: p.rotate + 360 * (Math.random() > 0.5 ? 1 : -1) }}
+          transition={{ duration: p.duration, delay: p.delay, ease: 'easeIn' }}
+          style={{
+            position: 'absolute', top: 0,
+            width: p.shape === 2 ? p.size * 2 : p.size,
+            height: p.size,
+            borderRadius: p.shape === 1 ? '50%' : p.shape === 2 ? 3 : 2,
+            background: p.color,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function OrderSuccessOverlay({ order, paymentData, finalTotals, onComplete }) {
+  const [countdown, setCountdown] = useState(5);
+  const isCOD = paymentData?.method === 'cod';
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) { clearInterval(timer); onComplete(); return 0; }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [onComplete]);
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9998,
+      background: 'radial-gradient(ellipse at 50% 30%, #0d0b1e 0%, #050508 100%)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: 'var(--font-body)',
+    }}>
+      <Confetti />
+
+      {/* Glowing background orbs */}
+      <div style={{ position:'absolute', width:500, height:500, borderRadius:'50%', background:'radial-gradient(circle, rgba(124,106,255,0.12) 0%, transparent 70%)', top:'10%', left:'50%', transform:'translateX(-50%)', pointerEvents:'none' }} />
+      <div style={{ position:'absolute', width:300, height:300, borderRadius:'50%', background:'radial-gradient(circle, rgba(255,106,154,0.08) 0%, transparent 70%)', bottom:'15%', right:'10%', pointerEvents:'none' }} />
+
+      <motion.div
+        initial={{ opacity: 0, scale: 0.85 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
+        style={{
+          width: '100%', maxWidth: 480, margin: '0 auto', padding: '0 20px',
+          textAlign: 'center', position: 'relative', zIndex: 1,
+        }}
+      >
+        {/* 3D floating package icon */}
+        <motion.div
+          animate={{ y: [0, -14, 0], rotateY: [0, 10, 0, -10, 0] }}
+          transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
+          style={{ display: 'inline-block', marginBottom: 8, perspective: 800 }}
+        >
+          {/* Outer glow ring */}
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: [0, 1.3, 1], opacity: [0, 0.6, 0.3] }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+            style={{
+              position: 'absolute', width: 140, height: 140,
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(124,106,255,0.35) 0%, transparent 70%)',
+              top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+              pointerEvents: 'none',
+            }}
+          />
+          {/* Circle backdrop */}
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 18, delay: 0.1 }}
+            style={{
+              width: 110, height: 110, borderRadius: '50%',
+              background: 'linear-gradient(135deg, rgba(124,106,255,0.25) 0%, rgba(255,106,154,0.15) 100%)',
+              border: '2px solid rgba(124,106,255,0.4)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              position: 'relative',
+            }}
+          >
+            {/* SVG animated checkmark ring */}
+            <svg width="110" height="110" style={{ position:'absolute', top:0, left:0 }}>
+              <motion.circle
+                cx="55" cy="55" r="50"
+                fill="none"
+                stroke="url(#ringGrad)"
+                strokeWidth="3"
+                strokeLinecap="round"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 1.1, delay: 0.3, ease: 'easeOut' }}
+                strokeDasharray="1"
+                strokeDashoffset="0"
+              />
+              <defs>
+                <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#7c6aff" />
+                  <stop offset="100%" stopColor="#ff6a9a" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <Package size={44} color="#7c6aff" strokeWidth={1.5} />
+          </motion.div>
+        </motion.div>
+
+        {/* Animated checkmark badge */}
+        <motion.div
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', stiffness: 300, damping: 18, delay: 0.55 }}
+          style={{
+            width: 34, height: 34, borderRadius: '50%',
+            background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            position: 'relative', margin: '-14px auto 0', zIndex: 2,
+            boxShadow: '0 0 20px rgba(34,197,94,0.5)',
+          }}
+        >
+          <CheckCircle size={20} color="white" />
+        </motion.div>
+
+        {/* Headline */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.65, duration: 0.5 }}
+          style={{ marginTop: 22 }}
+        >
+          <h1 style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 'clamp(28px, 6vw, 38px)',
+            fontWeight: 900,
+            background: 'linear-gradient(135deg, #7c6aff 0%, #ff6a9a 100%)',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            lineHeight: 1.1, marginBottom: 8,
+          }}>
+            Order Placed! 🎉
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 15, lineHeight: 1.6, marginBottom: 6 }}>
+            {isCOD
+              ? 'Your order has been confirmed. Pay in cash when it arrives at your door.'
+              : 'Payment successful! Your order is confirmed and on its way.'}
+          </p>
+        </motion.div>
+
+        {/* Order details card */}
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.85, duration: 0.45 }}
+          style={{
+            marginTop: 22, marginBottom: 22,
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(124,106,255,0.25)',
+            borderRadius: 18, padding: '18px 22px',
+            backdropFilter: 'blur(12px)',
+          }}
+        >
+          {/* Order number */}
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 14, paddingBottom: 12, borderBottom:'1px solid rgba(255,255,255,0.07)' }}>
+            <span style={{ color:'var(--text-muted)', fontSize:12, fontWeight:600, textTransform:'uppercase', letterSpacing:1 }}>Order Number</span>
+            <span style={{ fontFamily:'monospace', fontWeight:800, fontSize:16, color:'var(--accent)', letterSpacing:1 }}>{order?.number}</span>
+          </div>
+          {/* Total */}
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:10 }}>
+            <span style={{ color:'var(--text-secondary)', fontSize:14 }}>Total Amount</span>
+            <span style={{ fontWeight:900, fontSize:20, fontFamily:'var(--font-display)' }}>{inr(finalTotals?.total)}</span>
+          </div>
+          {/* Payment method */}
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <span style={{ color:'var(--text-secondary)', fontSize:14 }}>Payment</span>
+            <span style={{
+              fontSize:12, fontWeight:700, padding:'3px 12px', borderRadius:20,
+              background: isCOD ? 'rgba(249,115,22,0.15)' : 'rgba(34,197,94,0.15)',
+              color: isCOD ? '#f97316' : '#22c55e',
+            }}>
+              {isCOD ? '🚚 Cash on Delivery' : '✅ Paid Online'}
+            </span>
+          </div>
+        </motion.div>
+
+        {/* Floating star sparkles */}
+        {[
+          { top:'12%', left:'5%', delay:0.3 },
+          { top:'18%', right:'8%', delay:0.5 },
+          { bottom:'30%', left:'3%', delay:0.7 },
+          { bottom:'25%', right:'5%', delay:0.9 },
+        ].map((pos, i) => (
+          <motion.div
+            key={i}
+            initial={{ scale:0, opacity:0 }}
+            animate={{ scale:[0,1.2,1], opacity:[0,1,0.6] }}
+            transition={{ delay: pos.delay, duration:0.5 }}
+            style={{ position:'fixed', ...pos }}
+          >
+            <Star size={16} color={CONFETTI_COLORS[i * 2]} fill={CONFETTI_COLORS[i * 2]} />
+          </motion.div>
+        ))}
+
+        {/* CTA button + countdown */}
+        <motion.div
+          initial={{ opacity:0, y:16 }}
+          animate={{ opacity:1, y:0 }}
+          transition={{ delay:1.05, duration:0.4 }}
+        >
+          <button
+            onClick={onComplete}
+            style={{
+              width:'100%', padding:'14px 0',
+              borderRadius:50, border:'none', cursor:'pointer',
+              background:'linear-gradient(135deg, #7c6aff 0%, #ff6a9a 100%)',
+              color:'white', fontFamily:'var(--font-body)',
+              fontSize:15, fontWeight:700,
+              boxShadow:'0 8px 32px rgba(124,106,255,0.35)',
+              marginBottom:12, display:'flex', alignItems:'center', justifyContent:'center', gap:10,
+            }}
+          >
+            <ShoppingBag size={18} /> View My Orders
+          </button>
+          <p style={{ color:'var(--text-muted)', fontSize:12 }}>
+            Redirecting automatically in <span style={{ color:'var(--accent)', fontWeight:700 }}>{countdown}s</span>…
+          </p>
+        </motion.div>
+      </motion.div>
+    </div>
   );
 }
