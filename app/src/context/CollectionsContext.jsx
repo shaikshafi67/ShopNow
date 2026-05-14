@@ -34,7 +34,8 @@ export function CollectionsProvider({ children }) {
 
   const addCollection = useCallback(async (col) => {
     const name = col.name ?? col.title ?? '';
-    const slug = col.slug ?? name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || `col-${Date.now()}`;
+    const slugBase = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const slug = col.slug ?? (slugBase || `col-${Date.now()}`);
     const { data, error } = await supabase.from('collections').insert({
       name, slug, description: col.description ?? '',
       image: col.image ?? null, is_auto: col.isAuto ?? false,
