@@ -147,7 +147,7 @@ export default function AdminAddProduct() {
   const [preview,   setPreview]   = useState(false);
   const fileRef   = useRef(null);
 
-  // Load existing product for edit
+  // Load existing product for edit — re-runs whenever the product data changes
   useEffect(() => {
     if (!isEdit) return;
     const p = byId(id);
@@ -193,7 +193,7 @@ export default function AdminAddProduct() {
       featured:     !!p.featured,
       tryOnReady:   !!p.tryOnReady,
     });
-  }, [id]);
+  }, [id, byId]);
 
   // ── Computed helpers ─────────────────────────────────────────────────────────
   const f = (key, val) => {
