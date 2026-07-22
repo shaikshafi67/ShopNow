@@ -4,12 +4,11 @@
   "description": "ShopNow E-Commerce REST API — Express + MongoDB",
   "main": "src/index.js",
   "type": "module",
- "scripts": {
-     "start": "node src/index.js",
-     "dev": "nodemon src/index.js",
-     "seed": "node src/config/seed.js",
-     "build": "cd ../app && npm install && npm run build"
-   },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "seed": "node src/config/seed.js",
+    "build": "cd ../app && npm install && npm run build"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
