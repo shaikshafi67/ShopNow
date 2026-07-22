@@ -152,7 +152,7 @@ app.post('/api/verify-payment', (req, res) => {
 
 // ── Serve frontend in production ──────────────────────────────────────────
 if (isProd) {
-  const distPath = path.resolve(__dirname, '../../app/dist');
+  const distPath = path.resolve(__dirname, '../public');
   app.use(express.static(distPath));
   app.get('*', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
 }
