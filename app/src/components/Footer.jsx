@@ -98,7 +98,7 @@ export default function Footer() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 28 }}>
               <p style={{ fontSize: 14, color: 'var(--text-secondary)', margin: 0 }}>India</p>
               <p style={{ fontSize: 14, color: 'var(--text-secondary)', margin: 0 }}>
-                Phone: <strong style={{ color: 'var(--text-primary)' }}>7201030522</strong>
+                Phone: <strong style={{ color: 'var(--text-primary)' }}>7207030522</strong>
               </p>
               <p style={{ fontSize: 14, color: 'var(--text-secondary)', margin: 0 }}>
                 Email: <strong style={{ color: 'var(--text-primary)' }}>shopnow7766@gmail.com</strong>
