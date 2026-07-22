@@ -8,7 +8,7 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "seed": "node src/config/seed.js",
-    "build": "cd ../app && npm install --include=dev && npm run build"
+    "build": "cd ../app && npm install --include=dev && npm run build && rm -rf ../server/public && cp -r dist ../server/public"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
