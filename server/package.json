@@ -5,12 +5,11 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-"scripts": {
-  "start": "node src/index.js",
-  "dev": "nodemon src/index.js",
-  "seed": "node src/config/seed.js",
-  "build": "cd ../app && npm install --include=dev && npm run build"
-},
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "seed": "node src/config/seed.js",
+    "build": "cd ../app && npm install --include=dev && npm run build"
+  },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "cloudinary": "^2.5.1",
